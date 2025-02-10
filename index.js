@@ -204,26 +204,39 @@ bot.on('text', async (ctx) => {
             break;
 
             case 'enter_mismatch_values_enemy':
-            session.mismatchValues.push(ctx.message.text);
-            if (session.mismatchValues.length < 6) {
-                ctx.reply(`Введите следующее значение (${session.mismatchValues.length + 1}/6):`);
-            } else {
-                const game = session.game;
-                game.set('matchValuesEnemy', session.matchValues);
-                game.set('mismatchValuesEnemy', session.mismatchValues);
-                game.set('enemyId', ctx.from.id);
-                game.set('enemyName', ctx.from.username || ctx.from.first_name || 'Аноним');
-                game.set('status', 'full');
-                await game.save();
+              session.mismatchValues.push(ctx.message.text);
+              if (session.mismatchValues.length < 6) {
+                  ctx.reply(`Введите следующее значение (${session.mismatchValues.length + 1}/6):`);
+              } else {
+                  session.step = 'enter_rate_enemy';
+                  ctx.reply('Сделайте ставку на количество совпадений (число от 0 до 12):');
+              }
+              break;
 
-                ctx.reply('Игра завершена!');
-                delete userSessions[ctx.from.id];
-            }
-            break;
+              case 'enter_rate_enemy':
+              const rate = parseInt(ctx.message.text);
+    
+              if (isNaN(rate) || rate < 0 || rate > 12) {
+                  return ctx.reply('Введите корректное число от 0 до 12:');
+              }
 
-        default:
-            ctx.reply('Неизвестная команда. Начните с /start');
-    }
+              const game = session.game;
+              game.set('matchValuesEnemy', session.matchValues);
+              game.set('mismatchValuesEnemy', session.mismatchValues);
+              game.set('enemyId', ctx.from.id);
+              game.set('enemyName', ctx.from.username || ctx.from.first_name || 'Аноним');
+              game.set('rateEnemy', rate);
+              game.set('status', 'full');
+
+              await game.save();
+              
+              ctx.reply(`Вы успешно присоединились к игре! Ваша ставка: ${rate}. Ожидайте хода ведущего!`);
+              delete userSessions[ctx.from.id];
+              break;
+
+                  default:
+                      ctx.reply('Неизвестная команда. Начните с /start');
+              }
 });
 
 // bot.telegram.deleteWebhook();
