@@ -90,7 +90,7 @@ bot.action('enter_game_id', (ctx) => {
 
 bot.action('custom_theme', (ctx) => {
   userSessions[ctx.from.id] = { step: 'enter_custom_theme', matchValues: [], mismatchValues: [], isRandom: false };
-  ctx.reply('Введите тему для игры на совпадение:');
+  ctx.reply('Введите тему игры на совпадение:');
 });
 
 
@@ -133,7 +133,7 @@ bot.on('text', async (ctx) => {
                 } else {
                   // Если первая тема введена пользователем, запрашиваем вторую у него
                   session.step = 'enter_new_custom_theme';
-                  ctx.reply('Введите новую тему:');
+                  ctx.reply('Введите тему игры на несовпадение:');
               }
             }
             break;
@@ -166,24 +166,32 @@ bot.on('text', async (ctx) => {
             break;
 
             case 'enter_game_id':
-            const gameId = ctx.message.text;
-            const Game = Parse.Object.extend('Games');
-            const query = new Parse.Query(Game);
-
-            try {
-                const game = await query.get(gameId);
-                session.game = game;
-                session.theme = game.get('MatchTheme');
-                session.alternateTheme = game.get('MismatchTheme');
-                session.matchValues = [];
-                session.mismatchValues = [];
-                session.step = 'enter_match_values_enemy';
-
-                ctx.reply(`Вы присоединились! Первая тема: ${session.theme}\nВведите первое значение:`);
-            } catch (error) {
-                ctx.reply('Такой игры не существует. Проверьте ID.');
-            }
-            break;
+              const gameId = ctx.message.text;
+              const Game = Parse.Object.extend('Games');
+              const query = new Parse.Query(Game);
+          
+              try {
+                  const game = await query.get(gameId);
+                  const creatorId = game.get('creatorId');
+                  const enemyId = game.get('enemyId');
+          
+                  // Проверяем, участвует ли пользователь в игре
+                  if (creatorId === ctx.from.id || enemyId === ctx.from.id) {
+                      return ctx.reply('Вы уже участвуете в этой игре!');
+                  }
+          
+                  session.game = game;
+                  session.theme = game.get('MatchTheme');
+                  session.alternateTheme = game.get('MismatchTheme');
+                  session.matchValues = [];
+                  session.mismatchValues = [];
+                  session.step = 'enter_match_values_enemy';
+          
+                  ctx.reply(`Вы присоединились! Тема игры на совпадение: ${session.theme}\nВведите первое значение:`);
+              } catch (error) {
+                  ctx.reply('Такой игры не существует. Проверьте ID.');
+              }
+              break;
 
             case 'enter_match_values_enemy':
             session.matchValues.push(ctx.message.text);
@@ -191,7 +199,7 @@ bot.on('text', async (ctx) => {
                 ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
             } else {
                 session.step = 'enter_mismatch_values_enemy';
-                ctx.reply(`Теперь введите 6 значений по второй теме: ${session.alternateTheme}\nВведите первое значение:`);
+                ctx.reply(`Тема игры на несовпадение: ${session.alternateTheme}\nВведите первое значение:`);
             }
             break;
 
@@ -208,7 +216,7 @@ bot.on('text', async (ctx) => {
                 game.set('status', 'full');
                 await game.save();
 
-                ctx.reply('Вы успешно присоединились к игре!');
+                ctx.reply('Игра завершена!');
                 delete userSessions[ctx.from.id];
             }
             break;
