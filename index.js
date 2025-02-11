@@ -39,31 +39,71 @@ bot.start((ctx) => {
     ]));
 });
 
-bot.command('list_games', async (ctx) => {
+// bot.command('list_games', async (ctx) => {
+//   const Game = Parse.Object.extend('Games');
+//   const query = new Parse.Query(Game);
+
+//   try {
+//       const results = await query.find(); // Получаем все игры из базы
+//       if (results.length === 0) {
+//           return ctx.reply('В базе данных пока нет активных игр.');
+//       }
+
+//       let message = '📜 Список доступных игр:\n\n';
+//       results.forEach((game, index) => {
+//           message += `${index + 1}. 🆔 ID: ${game.id}\n`;
+//           message += `🎭 Тема игры на совпадение: ${game.get('MatchTheme') || 'Не указана'}\n`;
+//           message += `🎭 Тема игры на несовпадение: ${game.get('MismatchTheme') || 'Не указана'}\n`;
+//           message += `👤 Создатель: ${game.get('creatorName') || 'Неизвестен'}\n`;
+//           message += `📌 Статус: ${game.get('status') || 'Неизвестен'}\n\n`;
+//       });
+
+//       ctx.reply(message);
+//   } catch (error) {
+//       console.error('Ошибка получения списка игр:', error.message);
+//       ctx.reply('Произошла ошибка при получении списка игр.');
+//   }
+// });
+
+bot.command('my_games', async (ctx) => {
+  const userId = ctx.from.id;
   const Game = Parse.Object.extend('Games');
-  const query = new Parse.Query(Game);
+
+  // Создаем два отдельных запроса
+  const query1 = new Parse.Query(Game);
+  query1.equalTo('creatorId', userId);
+
+  const query2 = new Parse.Query(Game);
+  query2.equalTo('enemyId', userId);
+
+  // Объединяем запросы
+  const mainQuery = Parse.Query.or(query1, query2);
 
   try {
-      const results = await query.find(); // Получаем все игры из базы
-      if (results.length === 0) {
-          return ctx.reply('В базе данных пока нет активных игр.');
+      const games = await mainQuery.find();
+
+      if (games.length === 0) {
+          return ctx.reply('Вы пока не участвуете в играх.');
       }
 
-      let message = '📜 Список доступных игр:\n\n';
-      results.forEach((game, index) => {
-          message += `${index + 1}. 🆔 ID: ${game.id}\n`;
-          message += `🎭 Тема игры на совпадение: ${game.get('MatchTheme') || 'Не указана'}\n`;
-          message += `🎭 Тема игры на несовпадение: ${game.get('MismatchTheme') || 'Не указана'}\n`;
-          message += `👤 Создатель: ${game.get('creatorName') || 'Неизвестен'}\n`;
-          message += `📌 Статус: ${game.get('status') || 'Неизвестен'}\n\n`;
-      });
+      for (const game of games) {
+          const gameId = game.id;
+          const creatorName = game.get('creatorName') || 'Неизвестный';
+          const enemyName = game.get('enemyName') || 'Ожидает соперника';
+          const status = game.get('status') === 'full' ? '✅ *Игра завершена*' : '🕹 *В поиске соперника*';
 
-      ctx.reply(message);
+          const message = `🎮 *Игра:*\n\n🆔 *ID:* \`${gameId}\`\n👤 *Создатель:* ${creatorName}\n🎭 *Соперник:* ${enemyName}\n📌 *Статус:* ${status}`;
+
+          await ctx.replyWithMarkdown(message, Markup.inlineKeyboard([
+              [Markup.button.callback(`▶️ Открыть игру`, `game_${gameId}`)]
+          ]));
+      }
   } catch (error) {
-      console.error('Ошибка получения списка игр:', error.message);
-      ctx.reply('Произошла ошибка при получении списка игр.');
+      console.error('Ошибка при получении игр:', error);
+      ctx.reply('Произошла ошибка. Попробуйте позже.');
   }
 });
+
 
 
 bot.action('create_game', (ctx) => {
