@@ -1,5 +1,7 @@
 require('dotenv').config();
 const { Telegraf, Markup, session } = require('telegraf');
+// const markdownTable = require('markdown-table');
+// import {markdownTable} from 'markdown-table';
 const Parse = require('parse/node');
 
 Parse.initialize(process.env.BACK4APP_APP_ID, process.env.BACK4APP_JS_KEY);
@@ -146,6 +148,112 @@ bot.action('random_theme', async (ctx) => {
   };
   ctx.reply(`Выбрана случайная тема: ${theme}\nВведите первое значение:`);
 });
+
+bot.action(/^game_(.+)$/, async (ctx) => {
+  const gameId = ctx.match[1];
+  const userId = ctx.from.id;
+  const Game = Parse.Object.extend('Games');
+  const query = new Parse.Query(Game);
+
+  try {
+      const game = await query.get(gameId);
+      if (!game) {
+          return ctx.answerCbQuery('❌ Игра не найдена.', { show_alert: true });
+      }
+
+      const creatorId = game.get('creatorId');
+      const creatorName = (game.get('creatorName') || 'Неизвестный').replace(/[-._]/g, '\\$&');
+      const enemyName = (game.get('enemyName') || 'Ожидает соперника').replace(/[-._]/g, '\\$&');
+      const status = game.get('status');
+
+      if (status !== 'full') {
+          return ctx.answerCbQuery('🕹 Игра еще не завершена.', { show_alert: true });
+      }
+
+      if (userId === creatorId) {
+          const matchTheme = (game.get('MatchTheme') || 'Не указана').replace(/[-._]/g, '\\$&');
+          const matchValuesCreator = (game.get('MatchValuesCreator') || []).map(v => v.replace(/[-._]/g, '\\$&'));
+          const mismatchTheme = (game.get('MismatchTheme') || 'Не указана').replace(/[-._]/g, '\\$&');
+          const mismatchValuesCreator = (game.get('MismatchValuesCreator') || []).map(v => v.replace(/[-._]/g, '\\$&'));
+          const rateCreator = (game.get('rateCreator') || 'Не сделана').toString().replace(/[-._]/g, '\\$&');
+
+          ctx.answerCbQuery('📋 Данные игры отправлены.', { show_alert: false });
+
+          const message =
+              `🎮 *Данные игры:*\n\n` +
+              `🆔 *ID игры:* \`${gameId}\`\n` +
+              `👤 *Создатель:* ${creatorName}\n` +
+              `🎭 *Соперник:* ${enemyName}\n` +
+              `⚖️ *Ваша ставка:* ${rateCreator}\n\n` +
+              `📌 Тема игры на совпадение: *${matchTheme}\n*` +
+              `────────────────────────\n` +
+              `📋 *Ваши значения:*\n` +
+              matchValuesCreator.map((v, i) => `${i + 1}\\.\ ${v}`).join('\n') + '\n\n' +
+              `📌 Тема игры на несовпадение: *${mismatchTheme}\n*` +
+              `────────────────────────\n` +
+              `📋 *Ваши значения:*\n` +
+              mismatchValuesCreator.map((v, i) => `${i + 1}\\.\ ${v}`).join('\n');
+
+              await ctx.replyWithMarkdownV2(message, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '💰 Сделать ставку', callback_data: `bet_${gameId}` }]
+                    ]
+                }
+            });
+            
+      } else {
+          ctx.answerCbQuery('❌ Вы не являетесь создателем этой игры.', { show_alert: true });
+      }
+  } catch (error) {
+      console.error('Ошибка при открытии игры:', error);
+      ctx.answerCbQuery('⚠️ Ошибка. Попробуйте позже.', { show_alert: true });
+  }
+});
+
+
+
+
+bot.action(/^bet_(.+)$/, async (ctx) => {
+  const gameId = ctx.match[1];
+  ctx.reply('Введите вашу ставку (число от 0 до 12):');
+  ctx.session.awaitingBet = { gameId, userId: ctx.from.id };
+});
+
+
+bot.on('text', async (ctx) => {
+  if (!ctx.session.awaitingBet) return;
+
+  const { gameId, userId } = ctx.session.awaitingBet;
+  const betValue = parseInt(ctx.message.text, 10);
+
+  if (isNaN(betValue) || betValue < 0 || betValue > 12) {
+      return ctx.reply('Введите корректное число от 0 до 12.');
+  }
+
+  const Game = Parse.Object.extend('Games');
+  const query = new Parse.Query(Game);
+
+  try {
+      const game = await query.get(gameId);
+      if (!game) return ctx.reply('Игра не найдена.');
+
+      if (game.get('creatorId') === userId) {
+          game.set('rateCreator', betValue);
+          await game.save();
+          ctx.reply(`✅ Ваша ставка ${betValue} сохранена!`);
+      } else {
+          ctx.reply('Вы не являетесь создателем этой игры.');
+      }
+  } catch (error) {
+      console.error('Ошибка при сохранении ставки:', error);
+      ctx.reply('Ошибка. Попробуйте позже.');
+  }
+
+  ctx.session.awaitingBet = null;
+});
+
+
 
 bot.on('text', async (ctx) => {
     const session = userSessions[ctx.from.id];
