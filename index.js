@@ -1,5 +1,8 @@
 require('dotenv').config();
 const { Telegraf, Markup, session } = require('telegraf');
+// const { Telegraf, Markup } = require('telegraf');
+// const { session } = require('@telegraf/session');
+
 // const markdownTable = require('markdown-table');
 // import {markdownTable} from 'markdown-table';
 const Parse = require('parse/node');
@@ -8,6 +11,7 @@ Parse.initialize(process.env.BACK4APP_APP_ID, process.env.BACK4APP_JS_KEY);
 Parse.serverURL = process.env.BACK4APP_SERVER_URL;
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
+// bot.use(session());
 
 // const bot = new Telegraf(process.env.BOT_TOKEN, {
 //   handlerTimeout: 0,
@@ -41,31 +45,6 @@ bot.start((ctx) => {
     ]));
 });
 
-// bot.command('list_games', async (ctx) => {
-//   const Game = Parse.Object.extend('Games');
-//   const query = new Parse.Query(Game);
-
-//   try {
-//       const results = await query.find(); // Получаем все игры из базы
-//       if (results.length === 0) {
-//           return ctx.reply('В базе данных пока нет активных игр.');
-//       }
-
-//       let message = '📜 Список доступных игр:\n\n';
-//       results.forEach((game, index) => {
-//           message += `${index + 1}. 🆔 ID: ${game.id}\n`;
-//           message += `🎭 Тема игры на совпадение: ${game.get('MatchTheme') || 'Не указана'}\n`;
-//           message += `🎭 Тема игры на несовпадение: ${game.get('MismatchTheme') || 'Не указана'}\n`;
-//           message += `👤 Создатель: ${game.get('creatorName') || 'Неизвестен'}\n`;
-//           message += `📌 Статус: ${game.get('status') || 'Неизвестен'}\n\n`;
-//       });
-
-//       ctx.reply(message);
-//   } catch (error) {
-//       console.error('Ошибка получения списка игр:', error.message);
-//       ctx.reply('Произошла ошибка при получении списка игр.');
-//   }
-// });
 
 bot.command('my_games', async (ctx) => {
   const userId = ctx.from.id;
@@ -105,8 +84,6 @@ bot.command('my_games', async (ctx) => {
       ctx.reply('Произошла ошибка. Попробуйте позже.');
   }
 });
-
-
 
 bot.action('create_game', (ctx) => {
     userSessions[ctx.from.id] = { step: 'choose_theme', matchValues: [], mismatchValues: [] };
@@ -212,108 +189,124 @@ bot.action(/^game_(.+)$/, async (ctx) => {
 });
 
 
+// bot.action(/^bet_(.+)$/, async (ctx) => {
+//   if (!ctx.session) ctx.session = {}; // Инициализация сессии
 
+//   ctx.session.awaitingBet = { gameId: ctx.match[1], userId: ctx.from.id };
+//   ctx.reply('Введите вашу ставку (число от 0 до 12):');
+// });
 
 bot.action(/^bet_(.+)$/, async (ctx) => {
   const gameId = ctx.match[1];
-  ctx.reply('Введите вашу ставку (число от 0 до 12):');
-  ctx.session.awaitingBet = { gameId, userId: ctx.from.id };
-});
-
-
-bot.on('text', async (ctx) => {
-  if (!ctx.session.awaitingBet) return;
-
-  const { gameId, userId } = ctx.session.awaitingBet;
-  const betValue = parseInt(ctx.message.text, 10);
-
-  if (isNaN(betValue) || betValue < 0 || betValue > 12) {
-      return ctx.reply('Введите корректное число от 0 до 12.');
-  }
+  const userId = ctx.from.id;
 
   const Game = Parse.Object.extend('Games');
   const query = new Parse.Query(Game);
 
   try {
       const game = await query.get(gameId);
-      if (!game) return ctx.reply('Игра не найдена.');
+      if (!game) return ctx.answerCbQuery('❌ Игра не найдена.', { show_alert: true });
 
-      if (game.get('creatorId') === userId) {
-          game.set('rateCreator', betValue);
-          await game.save();
-          ctx.reply(`✅ Ваша ставка ${betValue} сохранена!`);
-      } else {
-          ctx.reply('Вы не являетесь создателем этой игры.');
+      if (game.get('creatorId') !== userId) {
+          return ctx.answerCbQuery('❌ Вы не являетесь создателем этой игры.', { show_alert: true });
       }
-  } catch (error) {
-      console.error('Ошибка при сохранении ставки:', error);
-      ctx.reply('Ошибка. Попробуйте позже.');
-  }
 
-  ctx.session.awaitingBet = null;
+      // Сохраняем игру в сессии и переводим в режим ставки
+      userSessions[userId] = { step: 'enter_rate_creator', game };
+      ctx.reply('Введите вашу ставку (число от 0 до 12):');
+      ctx.answerCbQuery();
+  } catch (error) {
+      console.error('Ошибка при открытии ставки:', error);
+      ctx.answerCbQuery('⚠️ Ошибка. Попробуйте позже.', { show_alert: true });
+  }
 });
 
 
-
 bot.on('text', async (ctx) => {
-    const session = userSessions[ctx.from.id];
-    // if (!session) return;
+  const session = userSessions[ctx.from.id];
+    if (!session) return;
     if (!session || !session.step) return ctx.reply('Неизвестная команда. Начните с /start');
 
-    switch (session.step) {
-        case 'enter_custom_theme':
-            session.theme = ctx.message.text;
-            // session.isRandom = false; // Тема задана вручную
-            session.step = 'enter_match_values';
-            ctx.reply(`Тема игры на совпадение: ${session.theme}\nВведите первое значение:`);
-            break;
+  // if (!ctx.session) return;
 
-            case 'enter_match_values':
-            session.matchValues.push(ctx.message.text);
-            if (session.matchValues.length < 6) {
-                ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
-            } else {
-                if (session.isRandom) {
-                  // Если первая тема из базы, выбираем вторую тоже из базы
-                  session.mismatchTheme = await getRandomTheme(session.theme);
-                  session.step = 'enter_mismatch_values';
-                  ctx.reply(`Тема игры на несовпадение: ${session.mismatchTheme}\nВведите первое значение:`);
-                } else {
-                  // Если первая тема введена пользователем, запрашиваем вторую у него
-                  session.step = 'enter_new_custom_theme';
-                  ctx.reply('Введите тему игры на несовпадение:');
-              }
-            }
-            break;
+  // 🔹 Если ожидаем ставку
+  // if (session.awaitingBet) {
+  //     const { gameId, userId } = session.awaitingBet;
+  //     const rate = parseInt(ctx.message.text, 10);
 
-        case 'enter_new_custom_theme':
-            session.mismatchTheme = ctx.message.text;
-            session.step = 'enter_mismatch_values';
-            ctx.reply(`Тема игры на несовпадение: ${session.mismatchTheme}\nВведите первое значение:`);
-            break;
+  //     if (isNaN(rate) || rate < 0 || rate > 12) {
+  //         return ctx.reply('Введите корректное число от 0 до 12:');
+  //     }
 
-        case 'enter_mismatch_values':
-            session.mismatchValues.push(ctx.message.text);
-            if (session.mismatchValues.length < 6) {
-                ctx.reply(`Введите следующее значение (${session.mismatchValues.length + 1}/6):`);
-            } else {
-                const Game = Parse.Object.extend('Games');
-                const game = new Game();
-                game.set('MatchTheme', session.theme);
-                game.set('MismatchTheme', session.mismatchTheme);
-                game.set('MatchValuesCreator', session.matchValues);
-                game.set('MismatchValuesCreator', session.mismatchValues);
-                game.set('creatorId', ctx.from.id);
-                game.set('creatorName', ctx.from.username || ctx.from.first_name || 'Аноним'); // Сохранение имени
-                game.set('status', 'waiting');
-                await game.save();
-                
-                ctx.reply('Игра успешно создана и сохранена!');
-                delete userSessions[ctx.from.id];
-            }
-            break;
+  //     const Game = Parse.Object.extend('Games');
+  //     const query = new Parse.Query(Game);
 
-            case 'enter_game_id':
+  //     try {
+  //         const game = await query.get(gameId);
+  //         if (!game) return ctx.reply('Игра не найдена.');
+
+  //         if (game.get('creatorId') === userId) {
+  //             game.set('rateCreator', rate);
+  //             await game.save();
+  //             ctx.reply(`✅ Ваша ставка ${rate} сохранена!`);
+  //         } else {
+  //             ctx.reply('Вы не являетесь создателем этой игры.');
+  //         }
+  //     } catch (error) {
+  //         console.error('Ошибка при сохранении ставки:', error);
+  //         ctx.reply('Ошибка. Попробуйте позже.');
+  //     }
+
+  //     delete session.awaitingBet; // Очищаем сессию после ставки
+  //     return;
+  // }
+
+  // 🔹 Если идет процесс создания игры
+  switch (session.step) {
+      case 'enter_custom_theme':
+          session.theme = ctx.message.text;
+          session.step = 'enter_match_values';
+          ctx.reply(`Тема игры на совпадение: ${session.theme}\nВведите первое значение:`);
+          break;
+
+      case 'enter_match_values':
+          session.matchValues.push(ctx.message.text);
+          if (session.matchValues.length < 6) {
+              ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
+          } else {
+              session.step = 'enter_new_custom_theme';
+              ctx.reply('Введите тему игры на несовпадение:');
+          }
+          break;
+
+      case 'enter_new_custom_theme':
+          session.alternateTheme = ctx.message.text;
+          session.step = 'enter_mismatch_values';
+          ctx.reply(`Тема игры на несовпадение: ${session.alternateTheme}\nВведите первое значение:`);
+          break;
+
+      case 'enter_mismatch_values':
+          session.mismatchValues.push(ctx.message.text);
+          if (session.mismatchValues.length < 6) {
+              ctx.reply(`Введите следующее значение (${session.mismatchValues.length + 1}/6):`);
+          } else {
+              const Game = Parse.Object.extend('Games');
+              const game = new Game();
+              game.set('MatchTheme', session.theme);
+              game.set('MismatchTheme', session.alternateTheme);
+              game.set('MatchValuesCreator', session.matchValues);
+              game.set('MismatchValuesCreator', session.mismatchValues);
+              game.set('creatorId', ctx.from.id);
+              game.set('creatorName', ctx.from.username || ctx.from.first_name || 'Аноним');
+              game.set('status', 'waiting');
+              await game.save();
+              ctx.reply(`✅ Игра создана! ID: \`${game.id}\``);
+              // session = null;
+              delete userSessions[ctx.from.id];
+          }
+          break;
+
+          case 'enter_game_id':
               const gameId = ctx.message.text;
               const Game = Parse.Object.extend('Games');
               const query = new Parse.Query(Game);
@@ -382,13 +375,197 @@ bot.on('text', async (ctx) => {
               delete userSessions[ctx.from.id];
               break;
 
+              case 'enter_rate_creator': // 🔹 ЛОГИКА СТАВКИ ДЛЯ СОЗДАТЕЛЯ
+            const rateCreator = parseInt(ctx.message.text);
+            if (isNaN(rateCreator) || rateCreator < 0 || rateCreator > 12) {
+                return ctx.reply('Введите корректное число от 0 до 12:');
+            }
+
+            const gameCreator = session.game;
+            gameCreator.set('rateCreator', rateCreator);
+            await gameCreator.save();
+
+            ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена!`);
+            delete userSessions[ctx.from.id];
+            break;
+
                   default:
                       ctx.reply('Неизвестная команда. Начните с /start');
               }
 });
 
+// bot.on('text', async (ctx) => {
+//     const session = userSessions[ctx.from.id];
+//     // if (!session) return;
+//     if (!session || !session.step) return ctx.reply('Неизвестная команда. Начните с /start');
+
+//     switch (session.step) {
+//         case 'enter_custom_theme':
+//             session.theme = ctx.message.text;
+//             // session.isRandom = false; // Тема задана вручную
+//             session.step = 'enter_match_values';
+//             ctx.reply(`Тема игры на совпадение: ${session.theme}\nВведите первое значение:`);
+//             break;
+
+//             case 'enter_match_values':
+//             session.matchValues.push(ctx.message.text);
+//             if (session.matchValues.length < 6) {
+//                 ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
+//             } else {
+//                 if (session.isRandom) {
+//                   // Если первая тема из базы, выбираем вторую тоже из базы
+//                   session.mismatchTheme = await getRandomTheme(session.theme);
+//                   session.step = 'enter_mismatch_values';
+//                   ctx.reply(`Тема игры на несовпадение: ${session.mismatchTheme}\nВведите первое значение:`);
+//                 } else {
+//                   // Если первая тема введена пользователем, запрашиваем вторую у него
+//                   session.step = 'enter_new_custom_theme';
+//                   ctx.reply('Введите тему игры на несовпадение:');
+//               }
+//             }
+//             break;
+
+//         case 'enter_new_custom_theme':
+//             session.mismatchTheme = ctx.message.text;
+//             session.step = 'enter_mismatch_values';
+//             ctx.reply(`Тема игры на несовпадение: ${session.mismatchTheme}\nВведите первое значение:`);
+//             break;
+
+//         case 'enter_mismatch_values':
+//             session.mismatchValues.push(ctx.message.text);
+//             if (session.mismatchValues.length < 6) {
+//                 ctx.reply(`Введите следующее значение (${session.mismatchValues.length + 1}/6):`);
+//             } else {
+//                 const Game = Parse.Object.extend('Games');
+//                 const game = new Game();
+//                 game.set('MatchTheme', session.theme);
+//                 game.set('MismatchTheme', session.mismatchTheme);
+//                 game.set('MatchValuesCreator', session.matchValues);
+//                 game.set('MismatchValuesCreator', session.mismatchValues);
+//                 game.set('creatorId', ctx.from.id);
+//                 game.set('creatorName', ctx.from.username || ctx.from.first_name || 'Аноним'); // Сохранение имени
+//                 game.set('status', 'waiting');
+//                 await game.save();
+                
+//                 ctx.reply('Игра успешно создана и сохранена!');
+//                 delete userSessions[ctx.from.id];
+//             }
+//             break;
+
+//             case 'enter_game_id':
+//               const gameId = ctx.message.text;
+//               const Game = Parse.Object.extend('Games');
+//               const query = new Parse.Query(Game);
+          
+//               try {
+//                   const game = await query.get(gameId);
+//                   const creatorId = game.get('creatorId');
+//                   const enemyId = game.get('enemyId');
+          
+//                   // Проверяем, участвует ли пользователь в игре
+//                   if (creatorId === ctx.from.id || enemyId === ctx.from.id) {
+//                       return ctx.reply('Вы уже участвуете в этой игре!');
+//                   }
+          
+//                   session.game = game;
+//                   session.theme = game.get('MatchTheme');
+//                   session.alternateTheme = game.get('MismatchTheme');
+//                   session.matchValues = [];
+//                   session.mismatchValues = [];
+//                   session.step = 'enter_match_values_enemy';
+          
+//                   ctx.reply(`Вы присоединились! Тема игры на совпадение: ${session.theme}\nВведите первое значение:`);
+//               } catch (error) {
+//                   ctx.reply('Такой игры не существует. Проверьте ID.');
+//               }
+//               break;
+
+//             case 'enter_match_values_enemy':
+//             session.matchValues.push(ctx.message.text);
+//             if (session.matchValues.length < 6) {
+//                 ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
+//             } else {
+//                 session.step = 'enter_mismatch_values_enemy';
+//                 ctx.reply(`Тема игры на несовпадение: ${session.alternateTheme}\nВведите первое значение:`);
+//             }
+//             break;
+
+//             case 'enter_mismatch_values_enemy':
+//               session.mismatchValues.push(ctx.message.text);
+//               if (session.mismatchValues.length < 6) {
+//                   ctx.reply(`Введите следующее значение (${session.mismatchValues.length + 1}/6):`);
+//               } else {
+//                   session.step = 'enter_rate_enemy';
+//                   ctx.reply('Сделайте ставку на количество совпадений (число от 0 до 12):');
+//               }
+//               break;
+
+//               case 'enter_rate_enemy':
+//               const rate = parseInt(ctx.message.text);
+    
+//               if (isNaN(rate) || rate < 0 || rate > 12) {
+//                   return ctx.reply('Введите корректное число от 0 до 12:');
+//               }
+
+//               const game = session.game;
+//               game.set('matchValuesEnemy', session.matchValues);
+//               game.set('mismatchValuesEnemy', session.mismatchValues);
+//               game.set('enemyId', ctx.from.id);
+//               game.set('enemyName', ctx.from.username || ctx.from.first_name || 'Аноним');
+//               game.set('rateEnemy', rate);
+//               game.set('status', 'full');
+
+//               await game.save();
+              
+//               ctx.reply(`Вы успешно присоединились к игре! Ваша ставка: ${rate}. Ожидайте хода ведущего!`);
+//               delete userSessions[ctx.from.id];
+//               break;
+
+//                   default:
+//                       ctx.reply('Неизвестная команда. Начните с /start');
+//               }
+// });
+
+
+
+
+// bot.on('text', async (ctx) => {
+//   if (!ctx.session || !ctx.session.awaitingBet) return;
+
+//   const { gameId, userId } = ctx.session.awaitingBet;
+//   const rate = parseInt(ctx.message.text, 10);
+
+//   if (isNaN(rate) || rate < 0 || rate > 12) {
+//       return ctx.reply('Введите корректное число от 0 до 12:');
+//   }
+
+//   const Game = Parse.Object.extend('Games');
+//   const query = new Parse.Query(Game);
+
+//   try {
+//       const game = await query.get(gameId);
+//       if (!game) return ctx.reply('Игра не найдена.');
+
+//       if (game.get('creatorId') === userId) {
+//           game.set('rateCreator', rate);
+//           await game.save();
+//           ctx.reply(`✅ Ваша ставка ${rate} сохранена!`);
+//       } else {
+//           ctx.reply('Вы не являетесь создателем этой игры.');
+//       }
+//   } catch (error) {
+//       console.error('Ошибка при сохранении ставки:', error);
+//       ctx.reply('Ошибка. Попробуйте позже.');
+//   }
+
+//   delete ctx.session.awaitingBet; // Очищаем сессию после ставки
+// });
+
+
 // bot.telegram.deleteWebhook();
 // bot.startPolling();
+
+
 bot.launch().then(() => console.log('Бот запущен 🚀'));
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
