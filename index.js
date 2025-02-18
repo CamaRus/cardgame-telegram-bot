@@ -270,30 +270,30 @@ bot.action(/^bet_(.+)$/, async (ctx) => {
 
 
 // 🔹 Обработчик кнопки "Закончить" для второй темы (финал)
-bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
-  const gameId = ctx.match[1];
-  const userId = ctx.from.id;
-  const session = userSessions[userId];
+// bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
+//   const gameId = ctx.match[1];
+//   const userId = ctx.from.id;
+//   const session = userSessions[userId];
 
-  if (!session || session.gameId !== gameId) return;
+//   if (!session || session.gameId !== gameId) return;
 
-  // Сохраняем совпадения для второй темы
-  const game = new Parse.Query('Games');
-  const gameObj = await game.get(gameId);
-  if (!gameObj) return ctx.reply('Ошибка: игра не найдена.');
+//   // Сохраняем совпадения для второй темы
+//   const game = new Parse.Query('Games');
+//   const gameObj = await game.get(gameId);
+//   if (!gameObj) return ctx.reply('Ошибка: игра не найдена.');
 
-  gameObj.set('coincidences', {
-      match: session.matchCoincidences || [],
-      mismatch: session.coincidences || [],
-  });
-  gameObj.set('status', 'finish');
-  await gameObj.save();
+//   gameObj.set('coincidences', {
+//       match: session.matchCoincidences || [],
+//       mismatch: session.coincidences || [],
+//   });
+//   gameObj.set('status', 'finish');
+//   await gameObj.save();
 
-  delete userSessions[userId];
+//   delete userSessions[userId];
 
-  ctx.reply('✅ Совпадения сохранены! Игра завершена.');
-  return myGamesCommand(ctx);
-});
+//   ctx.reply('✅ Совпадения сохранены! Игра завершена.');
+//   return myGamesCommand(ctx);
+// });
 
 
 bot.action(/^finish_match_(.+)$/, async (ctx) => {
@@ -347,6 +347,79 @@ bot.action(/^finish_match_(.+)$/, async (ctx) => {
     );
 
 });
+
+bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
+  const gameId = ctx.match[1];
+  const userId = ctx.from.id;
+  const session = userSessions[userId];
+
+  if (!session || session.gameId !== gameId) return;
+
+  // Получаем игру из базы
+  const Game = Parse.Object.extend('Games');
+  const query = new Parse.Query(Game);
+  const gameObj = await query.get(gameId);
+  if (!gameObj) return ctx.reply('Ошибка: игра не найдена.');
+
+  // 🔹 Подсчет общего количества совпадений
+  const totalCoincidences = (session.matchCoincidences.length || 0) + (session.coincidences.length || 0);
+  
+  // 🔹 Получаем ставки игроков
+  const rateEnemy = gameObj.get('rateEnemy') || 0;
+  const rateCreator = gameObj.get('rateCreator') || 0;
+
+  // 🔹 Рассчитываем результаты
+  const resultEnemy = (rateEnemy <= totalCoincidences) ? rateEnemy : 0;
+  const resultCreator = (rateCreator <= totalCoincidences) ? rateCreator : 0;
+
+  // 🔹 Определяем победителя
+  let winnerId = null;
+  let winnerName = null;
+
+  if (resultCreator > resultEnemy) {
+      winnerId = gameObj.get('creatorId');
+      winnerName = gameObj.get('creatorName');
+  } else if (resultEnemy > resultCreator) {
+      winnerId = gameObj.get('enemyId');
+      winnerName = gameObj.get('enemyName');
+  }
+
+  // 🔹 Сохраняем данные в базе
+  gameObj.set('coincidences', {
+      match: session.matchCoincidences || [],
+      mismatch: session.coincidences || [],
+      total: totalCoincidences
+  });
+  gameObj.set('resultCreator', resultCreator);
+  gameObj.set('resultEnemy', resultEnemy);
+  gameObj.set('winnerId', winnerId);
+  gameObj.set('winnerName', winnerName);
+  gameObj.set('status', 'finish');
+
+  await gameObj.save();
+  delete userSessions[userId];
+
+  // 🔹 Отправляем сообщение об окончании игры
+  let winnerText = winnerName ? `🏆 Победитель: *${winnerName}*` : '🤝 Ничья!';
+  // ctx.replyWithMarkdown(
+  //     `✅ *Игра завершена!*\n\n` +
+  //     `🎯 *Совпадений:* ${totalCoincidences}\n\n` +
+  //     `👤 *${gameObj.get('creatorName')}:* ${resultCreator} очк.\n` +
+  //     `👤 *${gameObj.get('enemyName')}:* ${resultEnemy} очк.\n\n` +
+  //     winnerText
+  // );
+
+  await ctx.reply(
+    `✅ *Игра завершена!*\n\n` +
+      `🎯 *Совпадений:* ${totalCoincidences}\n\n` +
+      `👤 *${gameObj.get('creatorName')}:* ${resultCreator} очк.\n` +
+      `👤 *${gameObj.get('enemyName')}:* ${resultEnemy} очк.\n\n` +
+      winnerText
+);
+
+  return myGamesCommand(ctx);
+});
+
 
 
 
