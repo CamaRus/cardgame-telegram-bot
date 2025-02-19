@@ -62,13 +62,16 @@ async function myGamesCommand(ctx) {
 
       for (const game of games) {
           const gameId = game.id;
-          const creatorName = game.get('creatorName') || 'Неизвестный';
-          const enemyName = game.get('enemyName') || 'Ожидает соперника';
+          const creatorName = game.get('creatorName') || 'Аноним';
+          const creatorId = game.get('creatorId');
+          const enemyName = game.get('enemyName') || '';
           const status = game.get('status');
 
           let statusText = '🕹 В поиске соперника';
-          if (status === 'full') statusText = '⏳ Ожидается ставка';
-          if (status === 'working') statusText = '🎯 Игра идет';
+          if (status === 'full' && userId === creatorId) statusText = '⏳ Ваш ход';
+          if (status === 'full' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
+          if (status === 'working' && userId === creatorId) statusText = '🎯 Ваш ход';
+          if (status === 'working' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
           if (status === 'finish') statusText = '✅ Игра завершена';
 
           const message = `🎮 *Игра:*\n\n🆔 *ID:* \`${gameId}\`\n👤 *Создатель:* ${creatorName}\n🎭 *Соперник:* ${enemyName}\n📌 *Статус:* ${statusText}`;
@@ -125,7 +128,7 @@ bot.action('random_theme', async (ctx) => {
       mismatchValues: [], 
       isRandom: true  // Устанавливаем isRandom = true при случайной теме
   };
-  ctx.reply(`Выбрана случайная тема: ${theme}\nВведите первое значение:`);
+  ctx.reply(`Тема игры на совпадение: ${theme}\nВведите первое значение:`);
 });
 
 bot.action(/^game_(.+)$/, async (ctx) => {
@@ -144,13 +147,18 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       }
 
       const creatorId = game.get('creatorId');
-      const creatorName = (game.get('creatorName') || 'Неизвестный').replace(/[-._]/g, '\\$&');
+      const creatorName = (game.get('creatorName') || 'Аноним').replace(/[-._]/g, '\\$&');
       const enemyName = (game.get('enemyName') || 'Ожидает соперника').replace(/[-._]/g, '\\$&');
       const status = game.get('status');
+      const enemyId = game.get('enemyId');
 
-      if (status === 'waiting') {
-          return ctx.answerCbQuery('🕹 Игра еще не завершена.', { show_alert: true });
-      }
+      if (status === 'waiting' && userId !== creatorId) {
+        return ctx.answerCbQuery('🕹 Ожидание ведущего...', { show_alert: true });
+    }
+
+      else if (status === 'waiting' && userId === creatorId) {
+          return ctx.answerCbQuery('🕹 Ожидание соперника...', { show_alert: true });
+      } else 
 
       if (userId === creatorId && status === "full") {
           const matchTheme = (game.get('MatchTheme') || 'Не указана').replace(/[-._]/g, '\\$&');
@@ -234,7 +242,57 @@ bot.action(/^game_(.+)$/, async (ctx) => {
             ])
         );
           
-      } else  {
+      } else if (status === 'finish') {
+        const theme1 = game.get('MatchTheme') || 'Не указана';
+            const theme2 = game.get('MismatchTheme') || 'Не указана';
+            const matchValuesCreator = game.get('MatchValuesCreator') || [];
+            const mismatchValuesCreator = game.get('MismatchValuesCreator') || [];
+            const matchValuesEnemy = game.get('matchValuesEnemy') || [];
+            const mismatchValuesEnemy = game.get('mismatchValuesEnemy') || [];
+            const coincidences = game.get('coincidences') || { match: [], mismatch: [] };
+            const rateCreator = (game.get('rateCreator') || 0) + (creatorId === userId ? ' (вы)' : '');
+            const rateEnemy = (game.get('rateEnemy') || 0) + (enemyId === userId ? ' (вы)' : '');
+            const winnerName = game.get('winnerName') ? `${game.get('winnerName')}${game.get('winnerId') === userId ? ' (вы)' : ''}` : '🤝 Ничья!';
+
+            const message =
+                `🎮 <b>Результаты игры:</b>\n\n` +
+                `🆔 <b>ID игры:</b> <code>${gameId}</code>\n` +
+                `────────────────────────\n` +
+                `📌 <b>Игра на совпадение:</b>\n` + 
+                `${theme1}\n\n` +
+                `📝 <b>${creatorName}:</b>\n` +
+                matchValuesCreator.map((v, i) => `${i + 1}. ${v}`).join('\n') + '\n\n' +
+
+                `📝 <b>${enemyName}:</b>\n` +
+                matchValuesEnemy.map((v, i) => `${i + 1}. ${v}`).join('\n') + '\n\n' +
+                
+                `🎯 <b>Совпадения:</b>\n` +
+                (coincidences.match.length > 0 ? coincidences.match.join(', ') : '—') + '\n' +
+                `────────────────────────\n` +
+                `📌 <b>Игра на несовпадение:</b>\n` + 
+                `${theme2}\n\n` +
+                `📝 <b>${creatorName}:</b>\n` +
+                mismatchValuesCreator.map((v, i) => `${i + 1}. ${v}`).join('\n') + '\n\n' +
+
+                `📝 <b>${enemyName}:</b>\n` +
+                mismatchValuesEnemy.map((v, i) => `${i + 1}. ${v}`).join('\n') + '\n\n' +
+
+                `🎯 <b>Совпадения:</b>\n` +
+                (coincidences.mismatch.length > 0 ? coincidences.mismatch.join(', ') : '—') + '\n' +
+                  `────────────────────────\n` +
+                `⚖️ <b>Ставка ведущего:</b> ${rateCreator}\n` +
+                `⚖️ <b>Ставка соперника:</b> ${rateEnemy}\n` +
+                  `────────────────────────\n\n` +
+                `🏆 <b>Победитель:</b> ${winnerName}`;
+
+            await ctx.reply(message, { parse_mode: 'HTML' });
+      } else if (userId !== creatorId && status === "full") {
+        ctx.answerCbQuery('🎮 Ожидание хода ведущего!', { show_alert: true });
+      } else if (status === 'working' && userId !== creatorId) {
+        ctx.answerCbQuery('🎮 Ожидание хода ведущего!', { show_alert: true });
+      }
+      
+      else  {
           ctx.answerCbQuery('❌ Вы не являетесь создателем этой игры.', { show_alert: true });
       }
   } catch (error) {
@@ -410,10 +468,10 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
   // );
 
   await ctx.reply(
-    `✅ *Игра завершена!*\n\n` +
-      `🎯 *Совпадений:* ${totalCoincidences}\n\n` +
-      `👤 *${gameObj.get('creatorName')}:* ${resultCreator} очк.\n` +
-      `👤 *${gameObj.get('enemyName')}:* ${resultEnemy} очк.\n\n` +
+    `✅ Игра завершена!\n\n` +
+      `🎯 Совпадений: ${totalCoincidences}\n\n` +
+      `👤 ${gameObj.get('creatorName')}: ${resultCreator} очк.\n` +
+      `👤 ${gameObj.get('enemyName')}: ${resultEnemy} очк.\n\n` +
       winnerText
 );
 
@@ -439,7 +497,8 @@ bot.on('text', async (ctx) => {
           session.matchValues.push(ctx.message.text);
           if (session.matchValues.length < 6) {
               ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
-          } else {
+          } 
+          else {
               session.step = 'enter_new_custom_theme';
               ctx.reply('Введите тему игры на несовпадение:');
           }
