@@ -88,14 +88,16 @@ async function myGamesCommand(ctx) {
 
 // Добавляем команду `/my_games`
 bot.command('my_games', myGamesCommand);
+// bot.action('my_games', myGamesCommand);
+bot.action('my_games', (myGamesCommand));
 
 
 bot.action('create_game', (ctx) => {
-    userSessions[ctx.from.id] = { step: 'choose_theme', matchValues: [], mismatchValues: [] };
-    ctx.reply('Выберите способ выбора темы:', Markup.inlineKeyboard([
-        [Markup.button.callback('Своя тема', 'custom_theme')],
-        [Markup.button.callback('Случайная тема', 'random_theme')]
-    ]));
+  userSessions[ctx.from.id] = { step: 'choose_theme', matchValues: [], mismatchValues: [] };
+  ctx.reply('Выберите способ выбора темы:', Markup.inlineKeyboard([
+      [Markup.button.callback('Своя тема', 'custom_theme')],
+      [Markup.button.callback('Случайная тема', 'random_theme')]
+  ]));
 });
 
 bot.action('join_game', (ctx) => {
@@ -128,7 +130,14 @@ bot.action('random_theme', async (ctx) => {
       mismatchValues: [], 
       isRandom: true  // Устанавливаем isRandom = true при случайной теме
   };
-  ctx.reply(`Тема игры на совпадение: ${theme}\nВведите первое значение:`);
+  const message =
+                `Тема игры на совпадение:\n` +
+                `<b>${theme}</b>\n` +
+                `Введите первое значение: `;
+
+            await ctx.reply(message, { parse_mode: 'HTML' });
+
+  // ctx.reply(`Тема игры на совпадение: ${theme}\nВведите первое значение:`);
 });
 
 bot.action(/^game_(.+)$/, async (ctx) => {
@@ -167,7 +176,7 @@ bot.action(/^game_(.+)$/, async (ctx) => {
           const mismatchValuesCreator = (game.get('MismatchValuesCreator') || []).map(v => v.replace(/[-._]/g, '\\$&'));
           const rateCreator = (game.get('rateCreator') || 'Не сделана').toString().replace(/[-._]/g, '\\$&');
 
-          ctx.answerCbQuery('📋 Данные игры отправлены.', { show_alert: false });
+          ctx.answerCbQuery('📋 Данные отправлены!', { show_alert: false });
 
           const message =
               `🎮 *Данные игры:*\n\n` +
@@ -201,13 +210,13 @@ bot.action(/^game_(.+)$/, async (ctx) => {
             const rateCreator = game.get('rateCreator') || 'Не сделана';
             const rateEnemy = game.get('rateEnemy') || 'Не сделана';
 
-            ctx.answerCbQuery('📋 Данные игры отправлены.', { show_alert: false });
+            ctx.answerCbQuery('📋 Данные отправлены!', { show_alert: false });
 
             const message =
                 `🎮 <b>Данные игры:</b>\n\n` +
                 `🆔 <b>ID игры:</b> <code>${gameId}</code>\n` +
                 `👤 <b>Соперник:</b> ${enemyName}\n` +
-                `<b>Тема 1:</b> ${theme1}\n` +
+                `<b>Игра на совпадение:</b> ${theme1}\n` +
                 `────────────────────────\n\n` +
 
                 `<b>Ваши значения:</b>\n` +
@@ -236,9 +245,9 @@ bot.action(/^game_(.+)$/, async (ctx) => {
         );
         
         await ctx.reply(
-            'Нажмите кнопку ✅ Закончить, если хотите завершить ввод:',
+            'Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:',
             Markup.inlineKeyboard([
-                [Markup.button.callback('✅ Закончить', `finish_match_${gameId}`)]
+                [Markup.button.callback('✅ ЗАКОНЧИТЬ', `finish_match_${gameId}`)]
             ])
         );
           
@@ -287,9 +296,9 @@ bot.action(/^game_(.+)$/, async (ctx) => {
 
             await ctx.reply(message, { parse_mode: 'HTML' });
       } else if (userId !== creatorId && status === "full") {
-        ctx.answerCbQuery('🎮 Ожидание хода ведущего!', { show_alert: true });
+        ctx.answerCbQuery('🎮 Ожидание хода ведущего!..', { show_alert: true });
       } else if (status === 'working' && userId !== creatorId) {
-        ctx.answerCbQuery('🎮 Ожидание хода ведущего!', { show_alert: true });
+        ctx.answerCbQuery('🎮 Ожидание хода ведущего!..', { show_alert: true });
       }
       
       else  {
@@ -375,12 +384,12 @@ bot.action(/^finish_match_(.+)$/, async (ctx) => {
   const mismatchValuesCreator = game.get('MismatchValuesCreator') || [];
   const mismatchValuesEnemy = game.get('mismatchValuesEnemy') || [];
 
-  ctx.answerCbQuery('📋 Данные второй темы отправлены.', { show_alert: false });
+  ctx.answerCbQuery('📋 Данные отправлены!', { show_alert: false });
 
   const message =
-      `🎮 <b>Данные игры (Тема 2):</b>\n\n` +
+      `🎮 <b>Данные игры:</b>\n\n` +
       `🆔 <b>ID игры:</b> <code>${gameId}</code>\n` +
-      `<b>Тема 2:</b> ${theme2}\n` +
+      `<b>Игра на несовпадение:</b> ${theme2}\n` +
       `────────────────────────\n\n` +
       `<b>Ваши значения:</b>\n` +
       mismatchValuesCreator.map((v, i) => `${i + 1}. ${v}`).join('\n') + '\n\n' +
@@ -390,17 +399,17 @@ bot.action(/^finish_match_(.+)$/, async (ctx) => {
   await ctx.reply(message, { parse_mode: 'HTML' });
 
   await ctx.reply(
-        `Теперь введите совпадающие значения для второй темы: <b>${theme2}</b>\n\n` +
-          `Если закончили ввод, нажмите "✅ Закончить".`,
+        `Введите совпадающие значения для темы: <b>${theme2}</b>\n\n` +
+          `Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:`,
         {
             parse_mode: 'HTML'
         }
     );
     
     await ctx.reply(
-        '✅ Нажмите кнопку, если хотите завершить ввод:',
+        'Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:',
         Markup.inlineKeyboard([
-            [Markup.button.callback('✅ Закончить', `finish_mismatch_${gameId}`)]
+            [Markup.button.callback('✅ ЗАКОНЧИТЬ', `finish_mismatch_${gameId}`)]
         ])
     );
 
@@ -495,13 +504,33 @@ bot.on('text', async (ctx) => {
 
       case 'enter_match_values':
           session.matchValues.push(ctx.message.text);
+          // if (session.matchValues.length < 6) {
+          //     ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
+          // } 
+          // else {
+          //     session.step = 'enter_new_custom_theme';
+          //     ctx.reply('Введите тему игры на несовпадение:');
+          // }
           if (session.matchValues.length < 6) {
-              ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
-          } 
-          else {
+            ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
+        } else {
+            if (session.isRandom) {
+              // Если первая тема из базы, выбираем вторую тоже из базы
+              session.alternateTheme = await getRandomTheme();
+              session.step = 'enter_mismatch_values';
+              // ctx.reply(`Тема игры на несовпадение: ${session.alternateTheme}\nВведите первое значение:`);
+              const message =
+                `Тема игры на несовпадение:\n` +
+                `<b>${session.alternateTheme}</b>\n` +
+                `Введите первое значение: `;
+
+            await ctx.reply(message, { parse_mode: 'HTML' });
+            } else {
+              // Если первая тема введена пользователем, запрашиваем вторую у него
               session.step = 'enter_new_custom_theme';
               ctx.reply('Введите тему игры на несовпадение:');
           }
+        }
           break;
 
       case 'enter_new_custom_theme':
@@ -543,7 +572,7 @@ bot.on('text', async (ctx) => {
           
                   // Проверяем, участвует ли пользователь в игре
                   if (creatorId === ctx.from.id || enemyId === ctx.from.id) {
-                      return ctx.reply('Вы уже участвуете в этой игре!');
+                      return ctx.reply('Вы уже участвуете в этой игре или игра завершена!');
                   }
           
                   session.game = game;
@@ -552,8 +581,16 @@ bot.on('text', async (ctx) => {
                   session.matchValues = [];
                   session.mismatchValues = [];
                   session.step = 'enter_match_values_enemy';
-          
-                  ctx.reply(`Вы присоединились! Тема игры на совпадение: ${session.theme}\nВведите первое значение:`);
+                  
+
+                  // ctx.reply(`Вы присоединились! Тема игры на совпадение: ${session.theme}\nВведите первое значение:`);
+                  const message =
+                  `Вы присоединились!\n` + 
+                `Тема игры на совпадение:\n` +
+                `<b>${session.theme}</b>\n` +
+                `Введите первое значение: `;
+
+            await ctx.reply(message, { parse_mode: 'HTML' });
               } catch (error) {
                   ctx.reply('Такой игры не существует. Проверьте ID.');
               }
@@ -565,7 +602,13 @@ bot.on('text', async (ctx) => {
                 ctx.reply(`Введите следующее значение (${session.matchValues.length + 1}/6):`);
             } else {
                 session.step = 'enter_mismatch_values_enemy';
-                ctx.reply(`Тема игры на несовпадение: ${session.alternateTheme}\nВведите первое значение:`);
+                // ctx.reply(`Тема игры на несовпадение: ${session.alternateTheme}\nВведите первое значение:`);
+                const message =
+                `Тема игры на несовпадение:\n` +
+                `<b>${session.alternateTheme}</b>\n` +
+                `Введите первое значение: `;
+
+            await ctx.reply(message, { parse_mode: 'HTML' });
             }
             break;
 
@@ -626,13 +669,13 @@ bot.on('text', async (ctx) => {
           // }
 
           session.coincidences.push(ctx.message.text);
-          ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
+          await ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
           // 🔹 Добавляем кнопку "Закончить"
 
     await ctx.reply(
-      '✅ Нажмите кнопку, если хотите завершить ввод:',
+      'Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:',
       Markup.inlineKeyboard([
-          [Markup.button.callback('✅ Закончить (1 тема)', `finish_match_${session.gameId}`)]
+          [Markup.button.callback('✅ ЗАКОНЧИТЬ', `finish_match_${session.gameId}`)]
       ])
   );
   
@@ -646,12 +689,12 @@ bot.on('text', async (ctx) => {
           // }
 
           session.coincidences.push(ctx.message.text);
-          ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
+          await ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
 
           await ctx.reply(
-            '✅ Нажмите кнопку, если хотите завершить ввод:',
+            'Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:',
             Markup.inlineKeyboard([
-                [Markup.button.callback('✅ Закончить (2 тема)', `finish_mismatch_${session.gameId}`)]
+                [Markup.button.callback('✅ ЗАКОНЧИТЬ', `finish_mismatch_${session.gameId}`)]
             ])
         );
           break;
