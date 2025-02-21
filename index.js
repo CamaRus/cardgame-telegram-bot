@@ -30,22 +30,12 @@ async function getRandomTheme(excludedTheme = null) {
         console.error('Ошибка при получении темы:', error);
         return 'Ошибка при выборе темы';
     }
-}
+};
 
-bot.start((ctx) => {
-    userSessions[ctx.from.id] = { step: null, matchValues: [], mismatchValues: [] };
-    ctx.reply('Выберите действие:', Markup.inlineKeyboard([
-        [Markup.button.callback('Создать игру', 'create_game')],
-        [Markup.button.callback('Присоединиться', 'join_game')],
-        [Markup.button.callback('Мои игры', 'my_games')]
-    ]));
-});
-
-async function myGamesCommand(ctx) {
+async function displayGames(ctx, statusFilter = null) {
   const userId = ctx.from.id;
   const Game = Parse.Object.extend('Games');
 
-  // Запрос всех игр, где пользователь creatorId или enemyId
   const query1 = new Parse.Query(Game);
   query1.equalTo('creatorId', userId);
 
@@ -53,11 +43,16 @@ async function myGamesCommand(ctx) {
   query2.equalTo('enemyId', userId);
 
   const mainQuery = Parse.Query.or(query1, query2);
+  if (statusFilter) {
+      mainQuery.equalTo('status', statusFilter);
+  } else {
+      mainQuery.notEqualTo('status', 'finish');
+  }
 
   try {
       const games = await mainQuery.find();
       if (games.length === 0) {
-          return ctx.reply('Вы пока не участвуете в играх.');
+          return ctx.reply('⚠️ Нет игр в выбранной категории.');
       }
 
       for (const game of games) {
@@ -68,13 +63,19 @@ async function myGamesCommand(ctx) {
           const status = game.get('status');
 
           let statusText = '🕹 В поиске соперника';
+
           if (status === 'full' && userId === creatorId) statusText = '⏳ Ваш ход';
           if (status === 'full' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
           if (status === 'working' && userId === creatorId) statusText = '🎯 Ваш ход';
           if (status === 'working' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
           if (status === 'finish') statusText = '✅ Игра завершена';
 
-          const message = `🎮 *Игра:*\n\n🆔 *ID:* \`${gameId}\`\n👤 *Создатель:* ${creatorName}\n🎭 *Соперник:* ${enemyName}\n📌 *Статус:* ${statusText}`;
+          const message =
+              `🎮 *Игра:*\n\n` +
+              `🆔 *ID:* \`${gameId}\`\n` +
+              `👤 *Создатель:* ${creatorName}\n` +
+              `🎭 *Соперник:* ${enemyName}\n` +
+              `📌 *Статус:* ${statusText}`;
 
           await ctx.replyWithMarkdown(message, Markup.inlineKeyboard([
               [Markup.button.callback('▶️ Открыть игру', `game_${gameId}`)]
@@ -82,14 +83,105 @@ async function myGamesCommand(ctx) {
       }
   } catch (error) {
       console.error('Ошибка при получении игр:', error);
-      ctx.reply('Произошла ошибка. Попробуйте позже.');
+      ctx.reply('⚠️ Произошла ошибка. Попробуйте позже.');
   }
 }
 
+bot.start((ctx) => {
+    userSessions[ctx.from.id] = { step: null, matchValues: [], mismatchValues: [] };
+    ctx.reply('Выберите действие:', Markup.inlineKeyboard([
+        [Markup.button.callback('Создать игру', 'create_game')],
+        [Markup.button.callback('Присоединиться', 'join_game')],
+        [Markup.button.callback('Мои игры', 'my_games')],
+        [Markup.button.callback('Правила', 'rules')]
+    ]));
+});
+
+// async function myGamesCommand(ctx) {
+//   const userId = ctx.from.id;
+//   const Game = Parse.Object.extend('Games');
+
+//   // Запрос всех игр, где пользователь creatorId или enemyId
+//   const query1 = new Parse.Query(Game);
+//   query1.equalTo('creatorId', userId);
+
+//   const query2 = new Parse.Query(Game);
+//   query2.equalTo('enemyId', userId);
+
+//   const mainQuery = Parse.Query.or(query1, query2);
+
+//   try {
+//       const games = await mainQuery.find();
+//       if (games.length === 0) {
+//           return ctx.reply('Вы пока не участвуете в играх!');
+//       }
+
+//       for (const game of games) {
+//           const gameId = game.id;
+//           const creatorName = game.get('creatorName') || 'Аноним';
+//           const creatorId = game.get('creatorId');
+//           const enemyName = game.get('enemyName') || '';
+//           const status = game.get('status');
+
+//           let statusText = '🕹 В поиске соперника';
+//           if (status === 'full' && userId === creatorId) statusText = '⏳ Ваш ход';
+//           if (status === 'full' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
+//           if (status === 'working' && userId === creatorId) statusText = '🎯 Ваш ход';
+//           if (status === 'working' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
+//           if (status === 'finish') statusText = '✅ Игра завершена';
+
+//           const message = `🎮 *Игра:*\n\n🆔 *ID:* \`${gameId}\`\n👤 *Создатель:* ${creatorName}\n🎭 *Соперник:* ${enemyName}\n📌 *Статус:* ${statusText}`;
+
+//           await ctx.replyWithMarkdown(message, Markup.inlineKeyboard([
+//               [Markup.button.callback('▶️ Открыть игру', `game_${gameId}`)]
+//           ]));
+//       }
+//   } catch (error) {
+//       console.error('Ошибка при получении игр:', error);
+//       ctx.reply('Произошла ошибка. Попробуйте позже.');
+//   }
+// }
+
 // Добавляем команду `/my_games`
-bot.command('my_games', myGamesCommand);
-// bot.action('my_games', myGamesCommand);
-bot.action('my_games', (myGamesCommand));
+// bot.command('my_games', (displayGames));
+// bot.action('my_games', (myGamesCommand));
+// bot.action('my_games', (displayGames));
+
+bot.command('my_games', async (ctx) => {
+  await ctx.reply('Выберите категорию игр:', Markup.inlineKeyboard([
+      [Markup.button.callback('🎮 Текущие игры', 'current_games')],
+      [Markup.button.callback('✅ Завершённые игры', 'finished_games')]
+  ]));
+});
+
+bot.action('rules', (ctx) => {
+  ctx.reply(`Правила игры в «Карточки»:
+Игрокам даётся две темы: первая - на совпадение, вторая - на несовпадение.
+В игре на совпадение игрокам нужно предложить 6 ассоциаций на заданную тему таким образом, чтобы было как можно больше совпадений с соперником.
+В игре на несовпадение игрокам нужно предложить 6 ассоциаций на заданную тему таким образом, чтобы было как можно меньше совпадений с соперником.
+После игры игроки делают ставки на количество совпадений.
+Если ставка меньше количества совпадений - игрок получает то количество очков, которое поставил.
+Если ставка больше количества совпадений - игрок не получает очков.
+Если ставка равна количеству совпадений - игрок получает соответствующее количество очков.
+Игрок может создать свою игру (со своими темами или случайными) и пригласить другого игрока.
+Или игрок может присоединиться к случайной игре.
+Игрок, создавший игру является ведущим и судьёй игры.
+Приятной игры!
+PS. И не забывайте обновлять данные :)
+`);
+});
+
+bot.action('my_games', async (ctx) => {
+  await ctx.reply('Выберите категорию игр:', Markup.inlineKeyboard([
+      [Markup.button.callback('🎮 Текущие игры', 'current_games')],
+      [Markup.button.callback('✅ Завершённые игры', 'finished_games')]
+  ]));
+});
+
+// 🔹 Обработчики для кнопок
+bot.action('current_games', (ctx) => displayGames(ctx, null));
+bot.action('finished_games', (ctx) => displayGames(ctx, 'finish'));
+
 
 
 bot.action('create_game', (ctx) => {
