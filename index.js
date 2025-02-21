@@ -140,6 +140,52 @@ bot.action('random_theme', async (ctx) => {
   // ctx.reply(`Тема игры на совпадение: ${theme}\nВведите первое значение:`);
 });
 
+bot.action('random_opponent', async (ctx) => {
+  const userId = ctx.from.id;
+  const Game = Parse.Object.extend('Games');
+  const query = new Parse.Query(Game);
+
+  try {
+      // 🔹 Поиск игры со статусом waiting, где пользователь не участвует
+      query.equalTo('status', 'waiting');
+      query.notEqualTo('creatorId', userId);
+      query.doesNotExist('enemyId');
+      query.limit(1);
+
+      const availableGames = await query.find();
+
+      if (availableGames.length === 0) {
+          return ctx.reply('❌ В данный момент нет доступных игр. Попробуйте позже или создайте свою.');
+      }
+
+      const game = availableGames[0];
+      // game.set('enemyId', userId);
+      // game.set('enemyName', ctx.from.username || ctx.from.first_name || 'Аноним');
+      // game.set('status', 'full');
+      // await game.save();
+
+      userSessions[userId] = {
+          step: 'enter_match_values_enemy',
+          game,
+          theme: game.get('MatchTheme'),
+          alternateTheme: game.get('MismatchTheme'),
+          matchValues: [],
+          mismatchValues: [],
+      };
+      const message =
+                `🎮 Вы присоединились к игре со случайным соперником!\n` +
+                `📌 Тема игры на совпадение: \n`
+                `<b>${game.get('MatchTheme')}</b>\n` +
+                `Введите первое значение: `;
+      // ctx.reply(`🎮 Вы присоединились к игре со случайным соперником!\n\n📌 Тема игры на совпадение: ${game.get('MatchTheme')}\nВведите первое значение:`);
+      await ctx.reply(message, { parse_mode: 'HTML' });
+  } catch (error) {
+      console.error('Ошибка при поиске игры:', error);
+      ctx.reply('⚠️ Произошла ошибка при поиске игры. Попробуйте позже.');
+  }
+});
+
+
 bot.action(/^game_(.+)$/, async (ctx) => {
   // ✅ Отвечаем сразу, чтобы избежать ошибки
   // ctx.answerCbQuery().catch((err) => console.error('Ошибка при answerCbQuery:', err));
@@ -183,7 +229,7 @@ bot.action(/^game_(.+)$/, async (ctx) => {
               `🆔 *ID игры:* \`${gameId}\`\n` +
               `👤 *Создатель:* ${creatorName}\n` +
               `🎭 *Соперник:* ${enemyName}\n` +
-              `⚖️ *Ваша ставка:* ${rateCreator}\n\n` +
+              // `⚖️ *Ваша ставка:* ${rateCreator}\n\n` +
               `📌 Тема игры на совпадение: *${matchTheme}\n*` +
               `────────────────────────\n` +
               `📋 *Ваши значения:*\n` +
