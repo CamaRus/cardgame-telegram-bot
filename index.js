@@ -65,10 +65,12 @@ async function displayGames(ctx, statusFilter = null) {
           const enemyName = game.get('enemyName') || '';
           const status = game.get('status');
           const createdAt = game.get('createdAt').toLocaleString();
+          const matchTheme = game.get('MatchTheme');
+          const mismatchTheme = game.get('MismatchTheme');
 
-          let statusText = '🕹 В поиске соперника';
+          let statusText = '⏳ В поиске соперника';
 
-          if (status === 'full' && userId === creatorId) statusText = '⏳ Ваш ход';
+          if (status === 'full' && userId === creatorId) statusText = '🎯 Ваш ход';
           if (status === 'full' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
           if (status === 'working' && userId === creatorId) statusText = '🎯 Ваш ход';
           if (status === 'working' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
@@ -82,9 +84,25 @@ async function displayGames(ctx, statusFilter = null) {
               `🎭 *Соперник:* ${enemyName}\n` +
               `📌 *Статус:* ${statusText}`;
 
-          await ctx.replyWithMarkdown(message, Markup.inlineKeyboard([
-              [Markup.button.callback('▶️ Открыть игру', `game_${gameId}`)]
-          ]));
+        const message2 =
+              `🎮 *Данные игры:*\n\n` +
+              `🆔 *ID:* \`${gameId}\`\n` +
+              `📅 *Дата создания:* ${createdAt}\n` +
+              `👤 *Создатель:* ${creatorName}\n` +
+              `🎭 *Соперник:* ${enemyName}\n` +
+              `📑 *Игра на совпадение:* ${matchTheme}\n` +
+              `📑 *Игра на несовпадение:* ${mismatchTheme}\n` +
+              `📌 *Статус:* ${statusText}`;
+
+          if (status !== 'finish' ) {
+            await ctx.replyWithMarkdown(message, Markup.inlineKeyboard([
+                [Markup.button.callback('▶️ Открыть игру', `game_${gameId}`)]
+            ]));
+          } else {
+            await ctx.replyWithMarkdown(message2, Markup.inlineKeyboard([
+                [Markup.button.callback('▶️ Открыть игру', `game_${gameId}`)]
+            ]));
+          }
       }
   } catch (error) {
       console.error('Ошибка при получении игр:', error);
@@ -107,7 +125,7 @@ bot.start((ctx) => {
   ctx.reply(
       '👋 Добро пожаловать в интеллектуальную викторину «Совпадения»!\n\n📜 Используйте боковое меню для навигации по командам.',
       Markup.keyboard([
-          ['🎮 Создать игру', '🤝 Присоединиться к игре'],
+          ['🎮 Создать игру', '👥 Присоединиться к игре'],
           ['📂 Мои игры', 'ℹ️ Описание команд'],
           ['📜 Правила игры'],
       ])
@@ -118,12 +136,12 @@ bot.start((ctx) => {
 
 bot.hears('ℹ️ Описание команд', async (ctx) => {
   await ctx.replyWithMarkdown(
-      `📜 *Описание команд:*\n\n` +
-      `🎮 */start* – Запуск бота и открытие главного меню.\n` +
+      `📝 *Описание команд:*\n\n` +
+      `▶️ */start* – Запуск бота и открытие главного меню.\n` +
       `🛠️ */my_games* – Просмотр текущих и последних 10 завершённых игр.\n` +
-      `🎲 */create_game* – Начало новой игры.\n` +
-      `🤝 */join_game* – Присоединение к существующей игре.\n` +
-      `📝 */rules* – Правила игры.`
+      `⚔️ */create_game* – Начало новой игры.\n` +
+      `👥 */join_game* – Присоединение к существующей игре.\n` +
+      `📜 */rules* – Правила игры.`
   );
 });
 
@@ -135,7 +153,7 @@ bot.hears('📂 Мои игры', async (ctx) => {
     await bot.handleUpdate({ callback_query: { data: 'my_games', from: ctx.from, message: ctx.message } });
   });
 
-bot.hears('🤝 Присоединиться к игре', async (ctx) => {
+bot.hears('👥 Присоединиться к игре', async (ctx) => {
     await bot.handleUpdate({ callback_query: { data: 'join_game', from: ctx.from, message: ctx.message } });
   });
 
@@ -226,15 +244,15 @@ bot.action('finished_games', (ctx) => displayGames(ctx, 'finish'));
 bot.action('create_game', (ctx) => {
   userSessions[ctx.from.id] = { step: 'choose_theme', matchValues: [], mismatchValues: [] };
   ctx.reply('Выберите способ выбора темы:', Markup.inlineKeyboard([
-      [Markup.button.callback('Своя тема', 'custom_theme')],
-      [Markup.button.callback('Случайная тема', 'random_theme')]
+      [Markup.button.callback('✏️ Своя тема', 'custom_theme')],
+      [Markup.button.callback('🎲 Случайная тема', 'random_theme')]
   ]));
 });
 
 bot.action('join_game', (ctx) => {
   ctx.reply('Выберите способ присоединения:', Markup.inlineKeyboard([
-      [Markup.button.callback('Войти в игру', 'enter_game_id')],
-      [Markup.button.callback('Случайный соперник', 'random_opponent')]
+      [Markup.button.callback('🧑‍🤝‍🧑 Войти в игру', 'enter_game_id')],
+      [Markup.button.callback('🎲 Случайный соперник', 'random_opponent')]
   ]));
 });
 
@@ -286,7 +304,7 @@ bot.action('random_opponent', async (ctx) => {
       const availableGames = await query.find();
 
       if (availableGames.length === 0) {
-          return ctx.reply('❌ В данный момент нет доступных игр. Попробуйте позже или создайте свою.');
+          return ctx.reply('❌ В данный момент нет доступных игр. Попробуйте позже или создайте свою!');
       }
 
       const game = availableGames[0];
@@ -339,11 +357,11 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       const enemyId = game.get('enemyId');
 
       if (status === 'waiting' && userId !== creatorId) {
-        return ctx.answerCbQuery('🕹 Ожидание ведущего...', { show_alert: true });
+        return ctx.answerCbQuery('⏳ Ожидание ведущего...', { show_alert: true });
     }
 
       else if (status === 'waiting' && userId === creatorId) {
-          return ctx.answerCbQuery('🕹 Ожидание соперника...', { show_alert: true });
+          return ctx.answerCbQuery('⏳ Ожидание соперника...', { show_alert: true });
       } else 
 
       if (userId === creatorId && status === "full") {
@@ -473,9 +491,9 @@ bot.action(/^game_(.+)$/, async (ctx) => {
 
             await ctx.reply(message, { parse_mode: 'HTML' });
       } else if (userId !== creatorId && status === "full") {
-        ctx.answerCbQuery('🎮 Ожидание хода ведущего!..', { show_alert: true });
+        ctx.answerCbQuery('⏳ Ожидание хода ведущего!..', { show_alert: true });
       } else if (status === 'working' && userId !== creatorId) {
-        ctx.answerCbQuery('🎮 Ожидание хода ведущего!..', { show_alert: true });
+        ctx.answerCbQuery('⏳ Ожидание хода ведущего!..', { show_alert: true });
       }
       
       else  {
@@ -554,7 +572,7 @@ bot.action(/^finish_match_(.+)$/, async (ctx) => {
   const Game = Parse.Object.extend('Games');
   const query = new Parse.Query(Game);
   const game = await query.get(gameId);
-  if (!game) return ctx.reply('Ошибка: игра не найдена.');
+  if (!game) return ctx.reply('⚠️ Ошибка: игра не найдена.');
 
   // 🔹 Данные по второй теме
   const theme2 = game.get('MismatchTheme') || 'Не указана';
@@ -603,7 +621,7 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
   const Game = Parse.Object.extend('Games');
   const query = new Parse.Query(Game);
   const gameObj = await query.get(gameId);
-  if (!gameObj) return ctx.reply('Ошибка: игра не найдена.');
+  if (!gameObj) return ctx.reply('⚠️ Ошибка: игра не найдена.');
 
   // 🔹 Подсчет общего количества совпадений
   const totalCoincidences = (session.matchCoincidences.length || 0) + (session.coincidences.length || 0);
@@ -667,7 +685,7 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
 bot.on('text', async (ctx) => {
   const session = userSessions[ctx.from.id];
     if (!session) return;
-    if (!session || !session.step) return ctx.reply('Неизвестная команда. Начните с /start');
+    if (!session || !session.step) return ctx.reply('⚠️ Неизвестная команда. Начните с /start');
   // 🔹 Если идет процесс создания игры
   switch (session.step) {
       case 'enter_custom_theme':
@@ -728,7 +746,7 @@ bot.on('text', async (ctx) => {
               game.set('creatorName', ctx.from.username || ctx.from.first_name || 'Аноним');
               game.set('status', 'waiting');
               await game.save();
-              ctx.reply(`✅ Игра создана! ID: \`${game.id}\``);
+              ctx.reply(`✅ Игра создана! ID: <code>${game.id}</code>`);
               // session = null;
               delete userSessions[ctx.from.id];
           }
@@ -746,7 +764,7 @@ bot.on('text', async (ctx) => {
           
                   // Проверяем, участвует ли пользователь в игре
                   if (creatorId === ctx.from.id || enemyId === ctx.from.id) {
-                      return ctx.reply('Вы уже участвуете в этой игре или игра завершена!');
+                      return ctx.reply('⚠️ Вы уже участвуете в этой игре или игра завершена!');
                   }
           
                   session.game = game;
@@ -766,7 +784,7 @@ bot.on('text', async (ctx) => {
 
             await ctx.reply(message, { parse_mode: 'HTML' });
               } catch (error) {
-                  ctx.reply('Такой игры не существует. Проверьте ID.');
+                  ctx.reply('⚠️ Такой игры не существует. Проверьте ID!');
               }
               break;
 
@@ -792,7 +810,7 @@ bot.on('text', async (ctx) => {
                   ctx.reply(`Введите следующее значение (${session.mismatchValues.length + 1}/6):`);
               } else {
                   session.step = 'enter_rate_enemy';
-                  ctx.reply('Сделайте ставку на количество совпадений (число от 0 до 12):');
+                  ctx.reply('💰 Сделайте ставку на количество совпадений (число от 0 до 12):');
               }
               break;
 
@@ -800,7 +818,7 @@ bot.on('text', async (ctx) => {
               const rate = parseInt(ctx.message.text);
     
               if (isNaN(rate) || rate < 0 || rate > 12) {
-                  return ctx.reply('Введите корректное число от 0 до 12:');
+                  return ctx.reply('⚠️ Введите корректное число от 0 до 12:');
               }
 
               const game = session.game;
@@ -813,14 +831,14 @@ bot.on('text', async (ctx) => {
 
               await game.save();
               
-              ctx.reply(`Вы успешно присоединились к игре! Ваша ставка: ${rate}. Ожидайте хода ведущего!`);
+              ctx.reply(`✔️ Вы успешно присоединились к игре! Ваша ставка: ${rate}. Ожидайте хода ведущего!`);
               delete userSessions[ctx.from.id];
               break;
 
               case 'enter_rate_creator': // 🔹 ЛОГИКА СТАВКИ ДЛЯ СОЗДАТЕЛЯ
             const rateCreator = parseInt(ctx.message.text);
             if (isNaN(rateCreator) || rateCreator < 0 || rateCreator > 12) {
-                return ctx.reply('Введите корректное число от 0 до 12:');
+                return ctx.reply('⚠️ Введите корректное число от 0 до 12:');
             }
 
             const gameCreator = session.game;
@@ -873,7 +891,7 @@ bot.on('text', async (ctx) => {
         );
           break;
                   default:
-                      ctx.reply('Неизвестная команда. Начните с /start');
+                      ctx.reply('⚠️ Неизвестная команда. Начните с /start');
               }
 });
 
