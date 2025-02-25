@@ -45,8 +45,11 @@ async function displayGames(ctx, statusFilter = null) {
   const mainQuery = Parse.Query.or(query1, query2);
   if (statusFilter) {
       mainQuery.equalTo('status', statusFilter);
+      mainQuery.descending('createdAt');
+      mainQuery.limit(10); 
   } else {
       mainQuery.notEqualTo('status', 'finish');
+      mainQuery.descending('createdAt');
   }
 
   try {
@@ -61,6 +64,7 @@ async function displayGames(ctx, statusFilter = null) {
           const creatorId = game.get('creatorId');
           const enemyName = game.get('enemyName') || '';
           const status = game.get('status');
+          const createdAt = game.get('createdAt').toLocaleString();
 
           let statusText = '🕹 В поиске соперника';
 
@@ -71,8 +75,9 @@ async function displayGames(ctx, statusFilter = null) {
           if (status === 'finish') statusText = '✅ Игра завершена';
 
           const message =
-              `🎮 *Игра:*\n\n` +
+              `🎮 *Данные игры:*\n\n` +
               `🆔 *ID:* \`${gameId}\`\n` +
+              `📅 *Дата создания:* ${createdAt}\n` +
               `👤 *Создатель:* ${creatorName}\n` +
               `🎭 *Соперник:* ${enemyName}\n` +
               `📌 *Статус:* ${statusText}`;
@@ -87,60 +92,62 @@ async function displayGames(ctx, statusFilter = null) {
   }
 }
 
+// bot.start((ctx) => {
+//     userSessions[ctx.from.id] = { step: null, matchValues: [], mismatchValues: [] };
+//     ctx.reply('Выберите действие:', Markup.inlineKeyboard([
+//         [Markup.button.callback('Создать игру', 'create_game')],
+//         [Markup.button.callback('Присоединиться', 'join_game')],
+//         [Markup.button.callback('Мои игры', 'my_games')],
+//         [Markup.button.callback('Правила', 'rules')]
+//     ]));
+// });
+
 bot.start((ctx) => {
-    userSessions[ctx.from.id] = { step: null, matchValues: [], mismatchValues: [] };
-    ctx.reply('Выберите действие:', Markup.inlineKeyboard([
-        [Markup.button.callback('Создать игру', 'create_game')],
-        [Markup.button.callback('Присоединиться', 'join_game')],
-        [Markup.button.callback('Мои игры', 'my_games')],
-        [Markup.button.callback('Правила', 'rules')]
-    ]));
+  userSessions[ctx.from.id] = { step: null, matchValues: [], mismatchValues: [] };
+  ctx.reply(
+      '👋 Добро пожаловать в интеллектуальную викторину «Совпадения»!\n\n📜 Используйте боковое меню для навигации по командам.',
+      Markup.keyboard([
+          ['🎮 Создать игру', '🤝 Присоединиться к игре'],
+          ['📂 Мои игры', 'ℹ️ Описание команд'],
+          ['📜 Правила игры'],
+      ])
+      .resize()
+      .oneTime()
+  );
 });
 
-// async function myGamesCommand(ctx) {
-//   const userId = ctx.from.id;
-//   const Game = Parse.Object.extend('Games');
+bot.hears('ℹ️ Описание команд', async (ctx) => {
+  await ctx.replyWithMarkdown(
+      `📜 *Описание команд:*\n\n` +
+      `🎮 */start* – Запуск бота и открытие главного меню.\n` +
+      `🛠️ */my_games* – Просмотр текущих и последних 10 завершённых игр.\n` +
+      `🎲 */create_game* – Начало новой игры.\n` +
+      `🤝 */join_game* – Присоединение к существующей игре.\n` +
+      `📝 */rules* – Правила игры.`
+  );
+});
 
-//   // Запрос всех игр, где пользователь creatorId или enemyId
-//   const query1 = new Parse.Query(Game);
-//   query1.equalTo('creatorId', userId);
+bot.hears('🎮 Создать игру', async (ctx) => {
+  await bot.handleUpdate({ callback_query: { data: 'create_game', from: ctx.from, message: ctx.message } });
+});
 
-//   const query2 = new Parse.Query(Game);
-//   query2.equalTo('enemyId', userId);
+bot.hears('📂 Мои игры', async (ctx) => {
+    await bot.handleUpdate({ callback_query: { data: 'my_games', from: ctx.from, message: ctx.message } });
+  });
 
-//   const mainQuery = Parse.Query.or(query1, query2);
+bot.hears('🤝 Присоединиться к игре', async (ctx) => {
+    await bot.handleUpdate({ callback_query: { data: 'join_game', from: ctx.from, message: ctx.message } });
+  });
 
-//   try {
-//       const games = await mainQuery.find();
-//       if (games.length === 0) {
-//           return ctx.reply('Вы пока не участвуете в играх!');
-//       }
+  bot.hears('📜 Правила игры', async (ctx) => {
+    await bot.handleUpdate({ callback_query: { data: 'rules', from: ctx.from, message: ctx.message } });
+  });
 
-//       for (const game of games) {
-//           const gameId = game.id;
-//           const creatorName = game.get('creatorName') || 'Аноним';
-//           const creatorId = game.get('creatorId');
-//           const enemyName = game.get('enemyName') || '';
-//           const status = game.get('status');
+// bot.hears('🎮 Создать игру', (ctx) => ctx.answerCbQuery('Нажмите "Создать игру" в меню.'));
+// bot.hears('🤝 Присоединиться к игре', (ctx) => ctx.answerCbQuery('Нажмите "Присоединиться" в меню.'));
+// bot.hears('📂 Мои игры', (ctx) => myGamesCommand(ctx));
+// bot.hears('📂 Правила', (ctx) => bot.action(rules));
 
-//           let statusText = '🕹 В поиске соперника';
-//           if (status === 'full' && userId === creatorId) statusText = '⏳ Ваш ход';
-//           if (status === 'full' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
-//           if (status === 'working' && userId === creatorId) statusText = '🎯 Ваш ход';
-//           if (status === 'working' && userId !== creatorId) statusText = '⏳ Ожидание ведущего';
-//           if (status === 'finish') statusText = '✅ Игра завершена';
-
-//           const message = `🎮 *Игра:*\n\n🆔 *ID:* \`${gameId}\`\n👤 *Создатель:* ${creatorName}\n🎭 *Соперник:* ${enemyName}\n📌 *Статус:* ${statusText}`;
-
-//           await ctx.replyWithMarkdown(message, Markup.inlineKeyboard([
-//               [Markup.button.callback('▶️ Открыть игру', `game_${gameId}`)]
-//           ]));
-//       }
-//   } catch (error) {
-//       console.error('Ошибка при получении игр:', error);
-//       ctx.reply('Произошла ошибка. Попробуйте позже.');
-//   }
-// }
 
 // Добавляем команду `/my_games`
 // bot.command('my_games', (displayGames));
@@ -154,8 +161,40 @@ bot.command('my_games', async (ctx) => {
   ]));
 });
 
+bot.command('create_game', async (ctx) => {
+    await bot.handleUpdate({
+        callback_query: {
+            data: 'create_game',
+            from: ctx.from,
+            message: ctx.message
+        }
+    });
+});
+
+bot.command('join_game', async (ctx) => {
+    await bot.handleUpdate({
+        callback_query: {
+            data: 'join_game',
+            from: ctx.from,
+            message: ctx.message
+        }
+    });
+});
+
+bot.command('rules', async (ctx) => {
+    await bot.handleUpdate({
+        callback_query: {
+            data: 'rules',
+            from: ctx.from,
+            message: ctx.message
+        }
+    });
+});
+
+
+
 bot.action('rules', (ctx) => {
-  ctx.reply(`Правила игры в «Карточки»:
+  ctx.reply(`Правила игры в «Совпадения»:
 Игрокам даётся две темы: первая - на совпадение, вторая - на несовпадение.
 В игре на совпадение игрокам нужно предложить 6 ассоциаций на заданную тему таким образом, чтобы было как можно больше совпадений с соперником.
 В игре на несовпадение игрокам нужно предложить 6 ассоциаций на заданную тему таким образом, чтобы было как можно меньше совпадений с соперником.
@@ -624,9 +663,6 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
 
   return myGamesCommand(ctx);
 });
-
-
-
 
 bot.on('text', async (ctx) => {
   const session = userSessions[ctx.from.id];
