@@ -95,11 +95,11 @@ async function displayGames(ctx, statusFilter = null) {
               `📌 *Статус:* ${statusText}`;
 
           if (status !== 'finish' ) {
-            await ctx.replyWithMarkdown(message, Markup.inlineKeyboard([
+            await ctx.replyWithMarkdown(message2, Markup.inlineKeyboard([
                 [Markup.button.callback('▶️ Открыть игру', `game_${gameId}`)]
             ]));
           } else {
-            await ctx.replyWithMarkdown(message2, Markup.inlineKeyboard([
+            await ctx.replyWithMarkdown(message, Markup.inlineKeyboard([
                 [Markup.button.callback('▶️ Открыть игру', `game_${gameId}`)]
             ]));
           }
@@ -241,13 +241,45 @@ bot.action('finished_games', (ctx) => displayGames(ctx, 'finish'));
 
 
 
-bot.action('create_game', (ctx) => {
-  userSessions[ctx.from.id] = { step: 'choose_theme', matchValues: [], mismatchValues: [] };
-  ctx.reply('Выберите способ выбора темы:', Markup.inlineKeyboard([
-      [Markup.button.callback('✏️ Своя тема', 'custom_theme')],
-      [Markup.button.callback('🎲 Случайная тема', 'random_theme')]
-  ]));
+// bot.action('create_game', (ctx) => {
+//   userSessions[ctx.from.id] = { step: 'choose_theme', matchValues: [], mismatchValues: [] };
+//   ctx.reply('Выберите способ выбора темы:', Markup.inlineKeyboard([
+//       [Markup.button.callback('✏️ Своя тема', 'custom_theme')],
+//       [Markup.button.callback('🎲 Случайная тема', 'random_theme')]
+//   ]));
+// });
+
+bot.action('create_game', async (ctx) => {
+    const userId = ctx.from.id;
+    const Game = Parse.Object.extend('Games');
+    const query1 = new Parse.Query(Game);
+    query1.equalTo('creatorId', userId);
+    query1.notEqualTo('status', 'finish'); // 🔹 Только текущие игры
+
+    const query2 = new Parse.Query(Game);
+    query2.equalTo('enemyId', userId);
+    query2.notEqualTo('status', 'finish');
+
+  const mainQuery = Parse.Query.or(query1, query2);
+
+    try {
+        const currentGamesCount = await mainQuery.count(); // 🔹 Подсчёт текущих игр
+        if (currentGamesCount >= 10) {
+            return ctx.reply('⚠️ Вы достигли лимита в 10 текущих игр. Завершите одну из игр, чтобы создать новую!');
+        }
+
+        // 🔹 Если лимит не достигнут — продолжаем создание игры
+        userSessions[userId] = { step: 'choose_theme', matchValues: [], mismatchValues: [] };
+        await ctx.reply('Выберите способ выбора темы:', Markup.inlineKeyboard([
+            [Markup.button.callback('✏️ Своя тема', 'custom_theme')],
+            [Markup.button.callback('🎲 Случайная тема', 'random_theme')]
+        ]));
+    } catch (error) {
+        console.error('Ошибка при проверке количества игр:', error);
+        ctx.reply('⚠️ Произошла ошибка. Попробуйте позже.');
+    }
 });
+
 
 bot.action('join_game', (ctx) => {
   ctx.reply('Выберите способ присоединения:', Markup.inlineKeyboard([
@@ -284,7 +316,7 @@ bot.action('random_theme', async (ctx) => {
                 `<b>${theme}</b>\n` +
                 `Введите первое значение: `;
 
-            await ctx.reply(message, { parse_mode: 'HTML' });
+    await ctx.reply(message, { parse_mode: 'HTML' });
 
   // ctx.reply(`Тема игры на совпадение: ${theme}\nВведите первое значение:`);
 });
@@ -578,12 +610,14 @@ bot.action(/^finish_match_(.+)$/, async (ctx) => {
   const theme2 = game.get('MismatchTheme') || 'Не указана';
   const mismatchValuesCreator = game.get('MismatchValuesCreator') || [];
   const mismatchValuesEnemy = game.get('mismatchValuesEnemy') || [];
+  const enemyName = game.get('enemyName');
 
   ctx.answerCbQuery('📋 Данные отправлены!', { show_alert: false });
 
   const message =
       `🎮 <b>Данные игры:</b>\n\n` +
       `🆔 <b>ID игры:</b> <code>${gameId}</code>\n` +
+      `👤 <b>Соперник:</b> ${enemyName}\n` +
       `<b>Игра на несовпадение:</b> ${theme2}\n` +
       `────────────────────────\n\n` +
       `<b>Ваши значения:</b>\n` +
@@ -594,8 +628,7 @@ bot.action(/^finish_match_(.+)$/, async (ctx) => {
   await ctx.reply(message, { parse_mode: 'HTML' });
 
   await ctx.reply(
-        `Введите совпадающие значения для темы: <b>${theme2}</b>\n\n` +
-          `Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:`,
+        `Введите совпадающие значения для темы: <b>${theme2}</b>\n\n`,
         {
             parse_mode: 'HTML'
         }
@@ -679,7 +712,8 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
       winnerText
 );
 
-  return myGamesCommand(ctx);
+//   return myGamesCommand(ctx);
+return displayGames(ctx);
 });
 
 bot.on('text', async (ctx) => {
@@ -691,7 +725,7 @@ bot.on('text', async (ctx) => {
       case 'enter_custom_theme':
           session.theme = ctx.message.text;
           session.step = 'enter_match_values';
-          ctx.reply(`Тема игры на совпадение: ${session.theme}\nВведите первое значение:`);
+          ctx.reply(`Тема игры на совпадение: *${session.theme}*\nВведите первое значение:`);
           break;
 
       case 'enter_match_values':
@@ -728,7 +762,7 @@ bot.on('text', async (ctx) => {
       case 'enter_new_custom_theme':
           session.alternateTheme = ctx.message.text;
           session.step = 'enter_mismatch_values';
-          ctx.reply(`Тема игры на несовпадение: ${session.alternateTheme}\nВведите первое значение:`);
+          ctx.reply(`Тема игры на несовпадение: *${session.alternateTheme}*\nВведите первое значение:`);
           break;
 
       case 'enter_mismatch_values':
@@ -746,7 +780,7 @@ bot.on('text', async (ctx) => {
               game.set('creatorName', ctx.from.username || ctx.from.first_name || 'Аноним');
               game.set('status', 'waiting');
               await game.save();
-              ctx.reply(`✅ Игра создана! ID: <code>${game.id}</code>`);
+              ctx.reply(`✅ Игра создана! ID: *${game.id}*`);
               // session = null;
               delete userSessions[ctx.from.id];
           }
@@ -835,23 +869,48 @@ bot.on('text', async (ctx) => {
               delete userSessions[ctx.from.id];
               break;
 
-              case 'enter_rate_creator': // 🔹 ЛОГИКА СТАВКИ ДЛЯ СОЗДАТЕЛЯ
-            const rateCreator = parseInt(ctx.message.text);
-            if (isNaN(rateCreator) || rateCreator < 0 || rateCreator > 12) {
-                return ctx.reply('⚠️ Введите корректное число от 0 до 12:');
-            }
+            // case 'enter_rate_creator': // 🔹 ЛОГИКА СТАВКИ ДЛЯ СОЗДАТЕЛЯ
+            // const rateCreator = parseInt(ctx.message.text);
+            // if (isNaN(rateCreator) || rateCreator < 0 || rateCreator > 12) {
+            //     return ctx.reply('⚠️ Введите корректное число от 0 до 12:');
+            // }
 
-            const gameCreator = session.game;
-            gameCreator.set('rateCreator', rateCreator);
-            gameCreator.set('status', 'working'); // Обновляем статус игры
-            await gameCreator.save();
+            // const gameCreator = session.game;
+            // gameCreator.set('rateCreator', rateCreator);
+            // gameCreator.set('status', 'working'); // Обновляем статус игры
+            // await gameCreator.save();
 
-            ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена!`);
-            delete userSessions[ctx.from.id];
+            // ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена!`);
+            // delete userSessions[ctx.from.id];
 
-            // 🔹 Автоматически показываем список игр
-            return myGamesCommand(ctx);
-            break;
+            // // 🔹 Автоматически показываем список игр
+            // return displayGames(ctx);
+            // break;
+
+            case 'enter_rate_creator':
+    const rateCreator = parseInt(ctx.message.text);
+    
+    if (isNaN(rateCreator) || rateCreator < 0 || rateCreator > 12) {
+        return ctx.reply('⚠️ Введите корректное число от 0 до 12:');
+    }
+
+    const gameCreator = session.game;
+
+    // 🔹 Проверка: если ставка уже сделана, отклоняем повторный ввод
+    if (gameCreator.get('rateCreator') !== undefined) {
+        return ctx.reply('❌ Вы уже сделали ставку! Повторное изменение невозможно.');
+    }
+
+    gameCreator.set('rateCreator', rateCreator);
+    gameCreator.set('status', 'working'); // Обновляем статус игры
+    await gameCreator.save();
+
+    ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена!`);
+    delete userSessions[ctx.from.id];
+
+    // 🔹 Автоматически показываем список игр
+    return displayGames(ctx);
+    break;
 
             // 🔹 Ввод совпадающих значений по первой теме
         case 'enter_coincidences_match':
