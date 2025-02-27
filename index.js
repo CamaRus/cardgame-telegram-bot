@@ -58,7 +58,10 @@ async function displayGames(ctx, statusFilter = null) {
       const creatorId = game.get("creatorId");
       const enemyName = game.get("enemyName") || "";
       const status = game.get("status");
-      const createdAt = game.get("createdAt").toLocaleString();
+    //   const createdAt = game.get("createdAt").toLocaleString();
+      const createdAt = new Intl.DateTimeFormat('ru-RU', {
+        hour: '2-digit', minute: '2-digit'
+    }).format(game.get('createdAt'));
       const matchTheme = game.get("MatchTheme");
       const mismatchTheme = game.get("MismatchTheme");
 
@@ -786,9 +789,12 @@ bot.on("text", async (ctx) => {
         );
         game.set("status", "waiting");
         await game.save();
-        ctx.reply(`✅ Игра создана! ID: *${game.id}*`);
+        const message = `✅ Игра создана! ID: ` + `<code>${game.id}</code>`;
+        await ctx.reply(message, { parse_mode: "HTML" });
+        // ctx.reply(`✅ Игра создана! ID: ${game.id}`);
         // session = null;
         delete userSessions[ctx.from.id];
+        return displayGames();
       }
       break;
 
