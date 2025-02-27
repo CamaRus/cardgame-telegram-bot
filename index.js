@@ -59,9 +59,14 @@ async function displayGames(ctx, statusFilter = null) {
       const enemyName = game.get("enemyName") || "";
       const status = game.get("status");
     //   const createdAt = game.get("createdAt").toLocaleString();
-      const createdAt = new Intl.DateTimeFormat('ru-RU', {
-        hour: '2-digit', minute: '2-digit'
-    }).format(game.get('createdAt'));
+    const createdAt = game.get('createdAt').toLocaleString('ru-RU', {
+        timeZone: 'Europe/Moscow',  // 🔹 Указываем часовой пояс (можно изменить)
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
       const matchTheme = game.get("MatchTheme");
       const mismatchTheme = game.get("MismatchTheme");
 
