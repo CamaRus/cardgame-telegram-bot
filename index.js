@@ -121,6 +121,131 @@ async function displayGames(ctx, statusFilter = null) {
   }
 }
 
+async function finishMatch(ctx, gameId) {
+    const userId = ctx.from.id;
+    const session = userSessions[userId];
+
+    if (!session || session.gameId !== gameId) return;
+
+    session.matchCoincidences = [...session.coincidences]; // Сохраняем совпадения для первой темы
+    session.coincidences = []; // Очищаем список для второй темы
+    session.step = 'enter_coincidences_mismatch';
+
+    const Game = Parse.Object.extend('Games');
+    const query = new Parse.Query(Game);
+    const game = await query.get(gameId);
+    if (!game) return ctx.reply('Ошибка: игра не найдена.');
+
+    // 🔹 Данные по второй теме
+    const theme2 = game.get('MismatchTheme') || 'Не указана';
+    const mismatchValuesCreator = game.get('MismatchValuesCreator') || [];
+    const mismatchValuesEnemy = game.get('mismatchValuesEnemy') || [];
+    const enemyName = game.get("enemyName");
+
+    const message =
+    `🎮 <b>Данные игры:</b>\n\n` +
+    `🆔 <b>ID игры:</b> <code>${gameId}</code>\n` +
+    `👤 <b>Соперник:</b> ${enemyName}\n` +
+    `📌 <b>Игра на несовпадение:</b> ${theme2}\n` +
+    `────────────────────────\n\n` +
+    `<b>Ваши значения:</b>\n` +
+    mismatchValuesCreator.map((v, i) => `${i + 1}. ${v}`).join("\n") +
+    "\n\n" +
+    `<b>Значения соперника:</b>\n` +
+    mismatchValuesEnemy.map((v, i) => `${i + 1}. ${v || "-"}`).join("\n") +
+    "\n\n";
+
+  await ctx.reply(message, { parse_mode: "HTML" });
+
+  await ctx.reply(
+    `Введите совпадающие значения (по одному) для темы: <b>${theme2}</b>\n\n`,
+    {
+      parse_mode: "HTML",
+    }
+  );
+
+  await ctx.reply(
+    "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если совпадений (больше) нет:",
+    Markup.inlineKeyboard([
+      [Markup.button.callback("✅ ЗАКОНЧИТЬ", `finish_mismatch_${gameId}`)],
+    ])
+  );
+}
+
+async function finishMismatch(ctx, gameId) {
+    const userId = ctx.from.id;
+    const session = userSessions[userId];
+
+    if (!session || session.gameId !== gameId) return;
+
+    // Сохраняем совпадения для второй темы
+    const Game = Parse.Object.extend("Games");
+  const query = new Parse.Query(Game);
+  const gameObj = await query.get(gameId);
+  if (!gameObj) return ctx.reply("⚠️ Ошибка: игра не найдена.");
+      // 🔹 Подсчет общего количества совпадений
+  const totalCoincidences =
+  (session.matchCoincidences.length || 0) +
+  (session.coincidences.length || 0);
+
+// 🔹 Получаем ставки игроков
+const rateEnemy = gameObj.get("rateEnemy") || 0;
+const rateCreator = gameObj.get("rateCreator") || 0;
+
+// 🔹 Рассчитываем результаты
+const resultEnemy = rateEnemy <= totalCoincidences ? rateEnemy : 0;
+const resultCreator = rateCreator <= totalCoincidences ? rateCreator : 0;
+
+// 🔹 Определяем победителя
+let winnerId = null;
+let winnerName = null;
+
+if (resultCreator > resultEnemy) {
+  winnerId = gameObj.get("creatorId");
+  winnerName = gameObj.get("creatorName");
+} else if (resultEnemy > resultCreator) {
+  winnerId = gameObj.get("enemyId");
+  winnerName = gameObj.get("enemyName");
+}
+
+// 🔹 Сохраняем данные в базе
+gameObj.set("coincidences", {
+  match: session.matchCoincidences || [],
+  mismatch: session.coincidences || [],
+  total: totalCoincidences,
+});
+gameObj.set("resultCreator", resultCreator);
+gameObj.set("resultEnemy", resultEnemy);
+gameObj.set("winnerId", winnerId);
+gameObj.set("winnerName", winnerName);
+gameObj.set("status", "finish");
+
+await gameObj.save();
+delete userSessions[userId];
+
+// 🔹 Отправляем сообщение об окончании игры
+let winnerText = winnerName ? `🏆 Победитель: <b>${winnerName}</b>` : "🤝 Ничья!";
+
+//   await ctx.reply(
+//     `✅ Игра завершена!\n\n` +
+//       `🎯 Совпадений: ${totalCoincidences}\n\n` +
+//       `👤 ${gameObj.get("creatorName")}: ${resultCreator} очк.\n` +
+//       `👤 ${gameObj.get("enemyName")}: ${resultEnemy} очк.\n\n` +
+//       winnerText
+//   );
+
+const message =
+  `✅ <b>Игра завершена!</b>\n\n` +
+  `🎯 <b>Совпадений:</b> ${totalCoincidences}\n\n` +
+  `👤 <b>${gameObj.get("creatorName")}:</b> ${resultCreator} очк.\n` +
+  `👤 <b>${gameObj.get("enemyName")}:</b> ${resultEnemy} очк.\n\n` +
+  winnerText;
+
+await ctx.reply(message, { parse_mode: "HTML" });
+
+}
+
+
 
 bot.start((ctx) => {
   userSessions[ctx.from.id] = {
@@ -492,7 +617,7 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       };
 
       await ctx.reply(
-        `Введите совпадающие значения (по одному)для темы: <b>${theme1}</b>\n\n`,
+        `Введите совпадающие значения (по одному) для темы: <b>${theme1}</b>\n\n`,
         {
           parse_mode: "HTML",
         }
@@ -727,7 +852,6 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
     `🎯 <b>Совпадений:</b> ${totalCoincidences}\n\n` +
     `👤 <b>${gameObj.get("creatorName")}:</b> ${resultCreator} очк.\n` +
     `👤 <b>${gameObj.get("enemyName")}:</b> ${resultEnemy} очк.\n` +
-    `📌 <b>Игра на несовпадение:</b> ${theme2}\n` +
     winnerText;
 
   await ctx.reply(message, { parse_mode: "HTML" });
@@ -934,42 +1058,99 @@ bot.on("text", async (ctx) => {
       break;
 
     // 🔹 Ввод совпадающих значений по первой теме
-    case "enter_coincidences_match":
-      session.coincidences.push(ctx.message.text);
-      await ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
-      // 🔹 Добавляем кнопку "Закончить"
+    // case "enter_coincidences_match":
+    //   session.coincidences.push(ctx.message.text);
+    //   await ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
+    //   // 🔹 Добавляем кнопку "Закончить"
 
-      await ctx.reply(
-        "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:",
-        Markup.inlineKeyboard([
-          [
-            Markup.button.callback(
-              "✅ ЗАКОНЧИТЬ",
-              `finish_match_${session.gameId}`
-            ),
-          ],
-        ])
-      );
+    //   await ctx.reply(
+    //     "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:",
+    //     Markup.inlineKeyboard([
+    //       [
+    //         Markup.button.callback(
+    //           "✅ ЗАКОНЧИТЬ",
+    //           `finish_match_${session.gameId}`
+    //         ),
+    //       ],
+    //     ])
+    //   );
 
-      break;
+    //   break;
+
+      case 'enter_coincidences_match':
+    // if (session.coincidences.length >= 6) {
+    //     return ctx.reply('⚠️ Вы уже ввели максимальное количество совпадений (6).');
+    // }
+
+    session.coincidences.push(ctx.message.text);
+    ctx.reply(`✅ Добавлено: ${ctx.message.text} (${session.coincidences.length}/6)`);
+    if (session.coincidences.length < 6) {
+        await ctx.reply(
+            "Нажмите кнопку ✅ ЗАКОНЧИТЬ!!!, если хотите завершить ввод:",
+            Markup.inlineKeyboard([
+              [
+                Markup.button.callback(
+                  "✅ ЗАКОНЧИТЬ",
+                  `finish_match_${session.gameId}`
+                ),
+              ],
+            ])
+          );
+    }
+    
+    // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_match вручную
+    if (session.coincidences.length === 6) {
+        ctx.reply('✅ Вы ввели 6 совпадений. Переход к следующему этапу...');
+        return finishMatch(ctx, session.gameId);
+    }
+    break;
+
 
     // 🔹 Ввод совпадающих значений по второй теме
-    case "enter_coincidences_mismatch":
-      session.coincidences.push(ctx.message.text);
-      await ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
+    // case "enter_coincidences_mismatch":
+    //   session.coincidences.push(ctx.message.text);
+    //   await ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
 
-      await ctx.reply(
-        "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:",
-        Markup.inlineKeyboard([
-          [
-            Markup.button.callback(
-              "✅ ЗАКОНЧИТЬ",
-              `finish_mismatch_${session.gameId}`
-            ),
-          ],
-        ])
-      );
-      break;
+    //   await ctx.reply(
+    //     "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:",
+    //     Markup.inlineKeyboard([
+    //       [
+    //         Markup.button.callback(
+    //           "✅ ЗАКОНЧИТЬ",
+    //           `finish_mismatch_${session.gameId}`
+    //         ),
+    //       ],
+    //     ])
+    //   );
+    //   break;
+    case 'enter_coincidences_mismatch':
+    // if (session.coincidences.length >= 6) {
+    //     return ctx.reply('⚠️ Вы уже ввели максимальное количество совпадений (6).');
+    // }
+
+    session.coincidences.push(ctx.message.text);
+    ctx.reply(`✅ Добавлено: ${ctx.message.text} (${session.coincidences.length}/6)`);
+    if (session.coincidences.length < 6) {
+        await ctx.reply(
+            "Нажмите кнопку ✅ ЗАКОНЧИТЬ!!!, если хотите завершить ввод:",
+            Markup.inlineKeyboard([
+              [
+                Markup.button.callback(
+                  "✅ ЗАКОНЧИТЬ",
+                  `finish_mismatch_${session.gameId}`
+                ),
+              ],
+            ])
+          );
+    }
+
+    // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_mismatch вручную
+    if (session.coincidences.length === 6) {
+        ctx.reply('✅ Вы ввели 6 совпадений. Завершаем игру...');
+        return finishMismatch(ctx, session.gameId);
+    }
+    break;
+
     default:
       ctx.reply("⚠️ Неизвестная команда. Начните с /start");
   }
