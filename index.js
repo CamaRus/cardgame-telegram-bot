@@ -471,7 +471,7 @@ bot.action("random_opponent", async (ctx) => {
     query.equalTo("status", "waiting");
     query.notEqualTo("creatorId", userId);
     query.doesNotExist("enemyId");
-    query.limit(1);
+    // query.limit(1);
 
     const game = await query.first();
     // const availableGames = await query.find();
