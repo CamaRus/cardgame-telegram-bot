@@ -1105,7 +1105,17 @@ bot.on("text", async (ctx) => {
     }
     
     // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_match вручную
-    if (session.coincidences.length === 6) {
+    if (session.coincidences.length >= 6) {
+        const Game = Parse.Object.extend('Games');
+        const query = new Parse.Query(Game);
+        const game = await query.get(session.gameId);
+
+        if (!game) return ctx.reply('Ошибка: игра не найдена.');
+        // Переход к следующему этапу
+        session.matchCoincidences = [...session.coincidences]; // Сохраняем в сессии
+        session.coincidences = []; // Очищаем список для второй темы
+        // session.step = 'enter_coincidences_mismatch';
+        // await game.save();
         await ctx.reply('✅ Вы ввели 6 совпадений. Переход к следующему этапу...');
         return finishMatch(ctx, session.gameId);
     }
@@ -1151,7 +1161,12 @@ bot.on("text", async (ctx) => {
     }
 
     // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_mismatch вручную
-    if (session.coincidences.length === 6) {
+    if (session.coincidences.length >= 6) {
+        game.set('coincidences', {
+            match: session.matchCoincidences,
+            mismatch: session.coincidences
+        });
+        await game.save();
         await ctx.reply('✅ Вы ввели 6 совпадений. Завершаем игру...');
         return finishMismatch(ctx, session.gameId);
     }
