@@ -1162,6 +1162,9 @@ bot.on("text", async (ctx) => {
 
     // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_mismatch вручную
     if (session.coincidences.length >= 6) {
+        const Game = Parse.Object.extend('Games');
+        const query = new Parse.Query(Game);
+        const game = await query.get(session.gameId);
         game.set('coincidences', {
             match: session.matchCoincidences,
             mismatch: session.coincidences
