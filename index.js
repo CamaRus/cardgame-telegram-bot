@@ -473,15 +473,20 @@ bot.action("random_opponent", async (ctx) => {
     query.doesNotExist("enemyId");
     query.limit(1);
 
-    const availableGames = await query.find();
+    const game = await query.first();
+    // const availableGames = await query.find();
 
-    if (availableGames.length === 0) {
-      return ctx.reply(
-        "❌ В данный момент нет доступных игр. Попробуйте позже или создайте свою!"
-      );
+    if (!game) {
+        return ctx.reply('❌ Нет доступных игр. Попробуйте позже или создайте свою!');
     }
 
-    const game = availableGames[0];
+    // if (availableGames.length === 0) {
+    //   return ctx.reply(
+    //     "❌ В данный момент нет доступных игр. Попробуйте позже или создайте свою!"
+    //   );
+    // }
+
+    // const game = availableGames[0];
     userSessions[userId] = {
       step: "enter_match_values_enemy",
       game,
