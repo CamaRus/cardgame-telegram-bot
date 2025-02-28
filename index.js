@@ -471,22 +471,22 @@ bot.action("random_opponent", async (ctx) => {
     query.equalTo("status", "waiting");
     query.notEqualTo("creatorId", userId);
     query.doesNotExist("enemyId");
-    // query.limit(1);
+    query.limit(1);
 
-    const game = await query.first();
-    // const availableGames = await query.find();
+    // const game = await query.first();
+    const availableGames = await query.find();
 
-    if (!game) {
-        return ctx.reply('❌ Нет доступных игр. Попробуйте позже или создайте свою!');
-    }
-
-    // if (availableGames.length === 0) {
-    //   return ctx.reply(
-    //     "❌ В данный момент нет доступных игр. Попробуйте позже или создайте свою!"
-    //   );
+    // if (!game) {
+    //     return ctx.reply('❌ Нет доступных игр. Попробуйте позже или создайте свою!');
     // }
 
-    // const game = availableGames[0];
+    if (availableGames.length === 0) {
+      return ctx.reply(
+        "❌ В данный момент нет доступных игр. Попробуйте позже или создайте свою!"
+      );
+    }
+
+    const game = availableGames[0];
     userSessions[userId] = {
       step: "enter_match_values_enemy",
       game,
@@ -497,7 +497,8 @@ bot.action("random_opponent", async (ctx) => {
     };
     const message =
       `🎮 Вы присоединились к игре со случайным соперником!\n` +
-      `📌 Тема игры на совпадение: \n``<b>${game.get("MatchTheme")}</b>\n` +
+      `📌 Тема игры на совпадение: \n` + 
+      `<b>${game.get("MatchTheme")}</b>\n` +
       `Введите первое значение: `;
     // ctx.reply(`🎮 Вы присоединились к игре со случайным соперником!\n\n📌 Тема игры на совпадение: ${game.get('MatchTheme')}\nВведите первое значение:`);
     await ctx.reply(message, { parse_mode: "HTML" });
