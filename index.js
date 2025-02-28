@@ -121,7 +121,7 @@ async function displayGames(ctx, statusFilter = null) {
   }
 }
 
-async function finishMatch(ctx, gameId) {
+async function finishMatch(ctx, session) {
     const userId = ctx.from.id;
     const session = userSessions[userId];
 
@@ -133,7 +133,7 @@ async function finishMatch(ctx, gameId) {
 
     const Game = Parse.Object.extend('Games');
     const query = new Parse.Query(Game);
-    const game = await query.get(gameId);
+    const game = await query.get(session.gameId);
     if (!game) return ctx.reply('Ошибка: игра не найдена.');
 
     // 🔹 Данные по второй теме
@@ -172,7 +172,7 @@ async function finishMatch(ctx, gameId) {
   );
 }
 
-async function finishMismatch(ctx, gameId) {
+async function finishMismatch(ctx, session) {
     const userId = ctx.from.id;
     const session = userSessions[userId];
 
@@ -181,7 +181,7 @@ async function finishMismatch(ctx, gameId) {
     // Сохраняем совпадения для второй темы
     const Game = Parse.Object.extend("Games");
   const query = new Parse.Query(Game);
-  const gameObj = await query.get(gameId);
+  const gameObj = await query.get(session.gameId);
   if (!gameObj) return ctx.reply("⚠️ Ошибка: игра не найдена.");
       // 🔹 Подсчет общего количества совпадений
   const totalCoincidences =
@@ -1094,7 +1094,7 @@ bot.on("text", async (ctx) => {
         // Переход к следующему этапу
         session.matchCoincidences = [...session.coincidences]; // Сохраняем в сессии
         session.coincidences = []; // Очищаем список для второй темы
-        session.step = 'enter_coincidences_mismatch';
+        // session.step = 'enter_coincidences_mismatch';
         // await game.save();
         await ctx.reply('✅ Вы ввели 6 совпадений. Переход к следующему этапу...');
         return finishMatch(ctx, session);
