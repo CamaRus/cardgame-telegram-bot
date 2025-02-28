@@ -1030,7 +1030,7 @@ bot.on("text", async (ctx) => {
 
       await game.save();
 
-      ctx.reply(
+      await ctx.reply(
         `✔️ Вы успешно присоединились к игре! Ваша ставка: ${rate}.\n Ожидайте хода ведущего!`
       );
       delete userSessions[ctx.from.id];
@@ -1056,7 +1056,7 @@ bot.on("text", async (ctx) => {
       gameCreator.set("status", "working"); // Обновляем статус игры
       await gameCreator.save();
 
-      ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена!`);
+      await ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена!`);
       delete userSessions[ctx.from.id];
 
       // 🔹 Автоматически показываем список игр
@@ -1092,7 +1092,7 @@ bot.on("text", async (ctx) => {
     ctx.reply(`✅ Добавлено: ${ctx.message.text} (${session.coincidences.length}/6)`);
     if (session.coincidences.length < 6) {
         await ctx.reply(
-            "Нажмите кнопку ✅ ЗАКОНЧИТЬ!!!, если хотите завершить ввод:",
+            "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:",
             Markup.inlineKeyboard([
               [
                 Markup.button.callback(
@@ -1106,7 +1106,7 @@ bot.on("text", async (ctx) => {
     
     // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_match вручную
     if (session.coincidences.length === 6) {
-        ctx.reply('✅ Вы ввели 6 совпадений. Переход к следующему этапу...');
+        await ctx.reply('✅ Вы ввели 6 совпадений. Переход к следующему этапу...');
         return finishMatch(ctx, session.gameId);
     }
     break;
@@ -1138,7 +1138,7 @@ bot.on("text", async (ctx) => {
     ctx.reply(`✅ Добавлено: ${ctx.message.text} (${session.coincidences.length}/6)`);
     if (session.coincidences.length < 6) {
         await ctx.reply(
-            "Нажмите кнопку ✅ ЗАКОНЧИТЬ!!!, если хотите завершить ввод:",
+            "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:",
             Markup.inlineKeyboard([
               [
                 Markup.button.callback(
@@ -1152,7 +1152,7 @@ bot.on("text", async (ctx) => {
 
     // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_mismatch вручную
     if (session.coincidences.length === 6) {
-        ctx.reply('✅ Вы ввели 6 совпадений. Завершаем игру...');
+        await ctx.reply('✅ Вы ввели 6 совпадений. Завершаем игру...');
         return finishMismatch(ctx, session.gameId);
     }
     break;
