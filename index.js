@@ -1063,26 +1063,6 @@ bot.on("text", async (ctx) => {
       return displayGames(ctx);
       break;
 
-    // 🔹 Ввод совпадающих значений по первой теме
-    // case "enter_coincidences_match":
-    //   session.coincidences.push(ctx.message.text);
-    //   await ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
-    //   // 🔹 Добавляем кнопку "Закончить"
-
-    //   await ctx.reply(
-    //     "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:",
-    //     Markup.inlineKeyboard([
-    //       [
-    //         Markup.button.callback(
-    //           "✅ ЗАКОНЧИТЬ",
-    //           `finish_match_${session.gameId}`
-    //         ),
-    //       ],
-    //     ])
-    //   );
-
-    //   break;
-
       case 'enter_coincidences_match':
     // if (session.coincidences.length >= 6) {
     //     return ctx.reply('⚠️ Вы уже ввели максимальное количество совпадений (6).');
@@ -1114,36 +1094,14 @@ bot.on("text", async (ctx) => {
         // Переход к следующему этапу
         session.matchCoincidences = [...session.coincidences]; // Сохраняем в сессии
         session.coincidences = []; // Очищаем список для второй темы
-        // session.step = 'enter_coincidences_mismatch';
+        session.step = 'enter_coincidences_mismatch';
         // await game.save();
         await ctx.reply('✅ Вы ввели 6 совпадений. Переход к следующему этапу...');
-        return finishMatch(ctx, session.gameId);
+        return finishMatch(ctx, session);
     }
     break;
 
-
-    // 🔹 Ввод совпадающих значений по второй теме
-    // case "enter_coincidences_mismatch":
-    //   session.coincidences.push(ctx.message.text);
-    //   await ctx.reply(`✅ Добавлено: ${ctx.message.text}`);
-
-    //   await ctx.reply(
-    //     "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если хотите завершить ввод:",
-    //     Markup.inlineKeyboard([
-    //       [
-    //         Markup.button.callback(
-    //           "✅ ЗАКОНЧИТЬ",
-    //           `finish_mismatch_${session.gameId}`
-    //         ),
-    //       ],
-    //     ])
-    //   );
-    //   break;
     case 'enter_coincidences_mismatch':
-    // if (session.coincidences.length >= 6) {
-    //     return ctx.reply('⚠️ Вы уже ввели максимальное количество совпадений (6).');
-    // }
-
     session.coincidences.push(ctx.message.text);
     ctx.reply(`✅ Добавлено: ${ctx.message.text} (${session.coincidences.length}/6)`);
     if (session.coincidences.length < 6) {
@@ -1171,7 +1129,7 @@ bot.on("text", async (ctx) => {
         });
         await game.save();
         await ctx.reply('✅ Вы ввели 6 совпадений. Завершаем игру...');
-        return finishMismatch(ctx, session.gameId);
+        return finishMismatch(ctx, session);
     }
     break;
 
