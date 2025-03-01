@@ -848,9 +848,11 @@ bot.on("text", async (ctx) => {
     case "enter_custom_theme":
       session.theme = ctx.message.text;
       session.step = "enter_match_values";
-      ctx.reply(
-        `Тема игры на совпадение: *${session.theme}*\nВведите первое значение:`
-      );
+      const message =
+    `Тема игры на совпадение:\n` +
+    `<b>${session.theme}</b>\n` +
+    `Введите первое значение: `;
+    ctx.reply(message, { parse_mode: "HTML" });
       break;
 
     case "enter_match_values":
@@ -881,9 +883,13 @@ bot.on("text", async (ctx) => {
     case "enter_new_custom_theme":
       session.alternateTheme = ctx.message.text;
       session.step = "enter_mismatch_values";
-      ctx.reply(
-        `Тема игры на несовпадение: *${session.alternateTheme}*\nВведите первое значение:`
-      );
+      const message2 =
+            `Тема игры на несовпадение:\n` +
+            `<b>${session.alternateTheme}</b>\n` +
+            `Введите первое значение: `;
+
+        ctx.reply(message2, { parse_mode: "HTML" });
+      
       break;
 
     case "enter_mismatch_values":
