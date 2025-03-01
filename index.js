@@ -720,14 +720,17 @@ bot.action(/^finish_match_(.+)$/, async (ctx) => {
   const session = userSessions[userId];
 
   if (!session || session.gameId !== gameId) return;
+  const Game = Parse.Object.extend("Games");
+  const query = new Parse.Query(Game);
+  const game = await query.get(gameId);
+  game.set('coincidences', { match: session.coincidences }); // Сохраняем совпадения в БД
+    await game.save();
 
   session.matchCoincidences = [...session.coincidences]; // Сохраняем совпадения для первой темы
   session.coincidences = []; // Очищаем список для второй темы
   session.step = "enter_coincidences_mismatch";
 
-  const Game = Parse.Object.extend("Games");
-  const query = new Parse.Query(Game);
-  const game = await query.get(gameId);
+  
   if (!game) return ctx.reply("⚠️ Ошибка: игра не найдена.");
 
   // 🔹 Данные по второй теме
