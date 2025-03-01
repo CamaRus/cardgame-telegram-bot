@@ -1043,7 +1043,7 @@ bot.on("text", async (ctx) => {
     session.coincidences.push(ctx.message.text);
     ctx.reply(`✅ Добавлено: ${ctx.message.text} (${session.coincidences.length}/6)`);
     if (session.coincidences.length < 6) {
-        await ctx.reply(
+        ctx.reply(
             "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если совпадений (больше) нет!",
             Markup.inlineKeyboard([
               [
@@ -1058,7 +1058,7 @@ bot.on("text", async (ctx) => {
     
     // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_match вручную
     if (session.coincidences.length >= 6) {
-        await ctx.reply('✅ Вы ввели 6 совпадений. Переход к следующему этапу...');
+        await ctx.reply('✅ Вы ввели 6 совпадений. Переход к игре на несовпадение...');
         const Game = Parse.Object.extend("Games");
     const query = new Parse.Query(Game);
     const game = await query.get(session.gameId);
@@ -1072,7 +1072,7 @@ bot.on("text", async (ctx) => {
     session.coincidences.push(ctx.message.text);
     ctx.reply(`✅ Добавлено: ${ctx.message.text} (${session.coincidences.length}/6)`);
     if (session.coincidences.length < 6) {
-        await ctx.reply(
+        ctx.reply(
             "Нажмите кнопку ✅ ЗАКОНЧИТЬ, если совпадений (больше) нет!",
             Markup.inlineKeyboard([
               [
@@ -1087,7 +1087,7 @@ bot.on("text", async (ctx) => {
 
     // 🔹 Если достигнуто 6 значений, вызываем обработчик finish_mismatch вручную
     if (session.coincidences.length >= 6) {
-        await ctx.reply('✅ Вы ввели 6 совпадений. Завершаем игру...');
+        ctx.reply('✅ Вы ввели 6 совпадений. Завершаем игру...');
         return finishMismatch(ctx, session.gameId);
     }
     break;
