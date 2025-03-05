@@ -1219,7 +1219,7 @@ async function checkGameStatusUpdates() {
 }
 
 // 🔹 Запуск проверки каждые 10 секунд
-setInterval(checkGameStatusUpdates, 180000);
+setInterval(checkGameStatusUpdates, 360000);
 // if (global.statusCheckInterval) clearInterval(global.statusCheckInterval);
 // global.statusCheckInterval = setInterval(checkGameStatusUpdates, 10000);
 
