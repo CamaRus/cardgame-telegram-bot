@@ -120,6 +120,7 @@ async function displayGames(ctx, statusFilter = null) {
   }
 }
 
+
 async function finishMatch(ctx, gameId) {
     const userId = ctx.from.id;
     const session = userSessions[userId];
@@ -220,19 +221,18 @@ await gameObj.save();
 delete userSessions[userId];
 
 // 🔹 Отправляем сообщение об окончании игры
-let winnerText = winnerName ? `🏆 Победитель: <b>${winnerName}</b>` : "🤝 Ничья!";
+// let winnerText = winnerName ? `🏆 Победитель: <b>${winnerName}</b>` : "🤝 Ничья!";
 
-const message =
-  `✅ <b>Игра завершена!</b>\n\n` +
-  `🎯 <b>Совпадений:</b> ${totalCoincidences}\n\n` +
-  `👤 <b>${gameObj.get("creatorName")}:</b> ${resultCreator} очк.\n` +
-  `👤 <b>${gameObj.get("enemyName")}:</b> ${resultEnemy} очк.\n\n` +
-  winnerText;
+// const message =
+//   `✅ <b>Игра завершена!</b>\n\n` +
+//   `🎯 <b>Совпадений:</b> ${totalCoincidences}\n\n` +
+//   `👤 <b>${gameObj.get("creatorName")}:</b> ${resultCreator} очк.\n` +
+//   `👤 <b>${gameObj.get("enemyName")}:</b> ${resultEnemy} очк.\n\n` +
+//   winnerText;
 
-await ctx.reply(message, { parse_mode: "HTML" });
+// await ctx.reply(message, { parse_mode: "HTML" });
 
 }
-
 
 
 bot.start((ctx) => {
@@ -245,8 +245,8 @@ bot.start((ctx) => {
     "👋 Добро пожаловать в интеллектуальную викторину «Совпадения»!\n\n📜 Используйте боковое (нижнее) меню для навигации по командам.",
     Markup.keyboard([
       ["🎮 Создать игру", "👥 Присоединиться к игре"],
-      ["📂 Мои игры", "ℹ️ Описание команд"],
-      ["📜 Правила игры"],
+      ["🛠️ Текущие игры", "✅ Завершенные игры"],
+      ["📜 Правила игры", "ℹ️ Описание команд"],
     ])
       .resize()
       .oneTime()
@@ -257,7 +257,8 @@ bot.hears("ℹ️ Описание команд", async (ctx) => {
   await ctx.replyWithMarkdown(
     `📝 *Описание команд:*\n\n` +
       `▶️ */start* – Запуск бота и открытие главного меню.\n` +
-      `🛠️ */my_games* – Просмотр текущих и последних 10 завершённых игр.\n` +
+      `🛠️ */current_games* – Просмотр текущих игр.\n` +
+      `🛠️ */finished_games* – Просмотр последних 10 завершённых игр.\n` +
       `⚔️ */create_game* – Начало новой игры.\n` +
       `👥 */join_game* – Присоединение к существующей игре.\n` +
       `📜 */rules* – Правила игры.`
@@ -277,6 +278,18 @@ bot.hears("🎮 Создать игру", async (ctx) => {
 bot.hears("📂 Мои игры", async (ctx) => {
   await bot.handleUpdate({
     callback_query: { data: "my_games", from: ctx.from, message: ctx.message },
+  });
+});
+
+bot.hears("🛠️ Текущие игры", async (ctx) => {
+  await bot.handleUpdate({
+    callback_query: { data: "current_games", from: ctx.from, message: ctx.message },
+  });
+});
+
+bot.hears("✅ Завершенные игры", async (ctx) => {
+  await bot.handleUpdate({
+    callback_query: { data: "finished_games", from: ctx.from, message: ctx.message },
   });
 });
 
@@ -306,6 +319,26 @@ bot.command("create_game", async (ctx) => {
   await bot.handleUpdate({
     callback_query: {
       data: "create_game",
+      from: ctx.from,
+      message: ctx.message,
+    },
+  });
+});
+
+bot.command("current_games", async (ctx) => {
+  await bot.handleUpdate({
+    callback_query: {
+      data: "current_games",
+      from: ctx.from,
+      message: ctx.message,
+    },
+  });
+});
+
+bot.command("finished_games", async (ctx) => {
+  await bot.handleUpdate({
+    callback_query: {
+      data: "finished_games",
       from: ctx.from,
       message: ctx.message,
     },
@@ -825,16 +858,16 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
   delete userSessions[userId];
 
   // 🔹 Отправляем сообщение об окончании игры
-  let winnerText = winnerName ? `🏆 Победитель: <b>${winnerName}</b>` : "🤝 Ничья!";
+  // let winnerText = winnerName ? `🏆 Победитель: <b>${winnerName}</b>` : "🤝 Ничья!";
 
-  const message =
-    `✅ <b>Игра завершена!</b>\n\n` +
-    `🎯 <b>Совпадений:</b> ${totalCoincidences}\n\n` +
-    `👤 <b>${gameObj.get("creatorName")}:</b> ${resultCreator} очк.\n` +
-    `👤 <b>${gameObj.get("enemyName")}:</b> ${resultEnemy} очк.\n` +
-    winnerText;
+  // const message =
+  //   `✅ <b>Игра завершена!</b>\n\n` +
+  //   `🎯 <b>Совпадений:</b> ${totalCoincidences}\n\n` +
+  //   `👤 <b>${gameObj.get("creatorName")}:</b> ${resultCreator} очк.\n` +
+  //   `👤 <b>${gameObj.get("enemyName")}:</b> ${resultEnemy} очк.\n` +
+  //   winnerText;
 
-  await ctx.reply(message, { parse_mode: "HTML" });
+  // await ctx.reply(message, { parse_mode: "HTML" });
 
 });
 
@@ -915,7 +948,7 @@ bot.on("text", async (ctx) => {
         const message = `✅ Игра создана! ID: ` + `<code>${game.id}</code>`;
         await ctx.reply(message, { parse_mode: "HTML" });
         delete userSessions[ctx.from.id];
-        return displayGames(ctx);
+        // return displayGames(ctx);
       }
       break;
 
@@ -1032,7 +1065,7 @@ bot.on("text", async (ctx) => {
       gameCreator.set("status", "working"); // Обновляем статус игры
       await gameCreator.save();
 
-      await ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена!`);
+      await ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена! Ваш ход!`);
       delete userSessions[ctx.from.id];
 
       // 🔹 Автоматически показываем список игр
@@ -1099,6 +1132,97 @@ bot.on("text", async (ctx) => {
 
 // bot.telegram.deleteWebhook();
 // bot.startPolling();
+
+let lastCheckedTime = new Date();
+let notifiedGames = new Set(); // Кэш для предотвращения дублирования
+
+async function checkGameStatusUpdates() {
+  const Game = Parse.Object.extend('Games');
+  const query = new Parse.Query(Game);
+  
+  // Фильтруем игры, изменённые после последней проверки
+  query.greaterThan("updatedAt", lastCheckedTime);
+
+  try {
+      const updatedGames = await query.find();
+      // lastCheckedTime = new Date(); // Обновляем время последней проверки
+
+      for (const game of updatedGames) {
+          const status = game.get('status');
+          const creatorId = game.get('creatorId');
+          const enemyId = game.get('enemyId');
+
+          // let message = `📢 *Статус вашей игры обновлён!* 🆔 \`${game.id}\`\n`;
+
+          switch (status) {
+              case 'full':
+                  if (creatorId) {
+                      await bot.telegram.sendMessage(creatorId, `👥 Ваш соперник присоединился к игре ${game.id}! Ожидается ваша ставка! Проверьте текущие игры!`, { parse_mode: 'Markdown' }).catch(() => {});
+                  }
+                  // if (enemyId) {
+                  //     await bot.telegram.sendMessage(enemyId, `👥 Вы присоединились к игре! Ожидается ставка соперника!..`, { parse_mode: 'Markdown' }).catch(() => {});
+                  // }
+                  break;
+
+              // case 'working':
+              //     if (creatorId) {
+              //         await bot.telegram.sendMessage(creatorId, `🎯 Вы сделали ставку! Ваш ход!`, { parse_mode: 'Markdown' }).catch(() => {});
+              //     }
+              //     if (enemyId) {
+              //         await bot.telegram.sendMessage(enemyId, `🎯 Ваш соперник сделал ставку!..`, { parse_mode: 'Markdown' }).catch(() => {});
+              //     }
+              //     break;
+
+              case 'finish':
+                  let winnerId = game.get('winnerId');
+                  let winnerName = game.get('winnerName') || 'Ничья';
+
+                  let resultMessage = `✅ *Игра ${game.id} завершена!*\n\n🎖 *Победитель:* ${winnerName}`;
+
+                  if (creatorId) {
+                      let creatorMessage = resultMessage;
+                      if (creatorId === winnerId) {
+                          creatorMessage += `\n\n🎉 Поздравляем, вы победили!`;
+                      } else if (winnerId) {
+                          creatorMessage += `\n\n😔 К сожалению, вы проиграли.`;
+                      } else {
+                          creatorMessage += `\n\n🤝 Ничья!`;
+                      }
+                      await bot.telegram.sendMessage(creatorId, creatorMessage, { parse_mode: 'Markdown' }).catch(() => {});
+                  }
+
+                  if (enemyId) {
+                      let enemyMessage = resultMessage;
+                      if (enemyId === winnerId) {
+                          enemyMessage += `\n\n🎉 Поздравляем, вы победили!`;
+                      } else if (winnerId) {
+                          enemyMessage += `\n\n😔 К сожалению, вы проиграли.`;
+                      } else {
+                          enemyMessage += `\n\n🤝 Ничья!`;
+                      }
+                      await bot.telegram.sendMessage(enemyId, enemyMessage, { parse_mode: 'Markdown' }).catch(() => {});
+                  }
+                  break;
+          }
+          
+      }
+      // Обновляем время последней проверки после обработки всех игр
+      lastCheckedTime = new Date();
+
+      // Очищаем кэш уведомлений раз в 5 минут
+      if (notifiedGames.size > 50) {
+          notifiedGames.clear();
+      }
+  } catch (error) {
+      console.error('Ошибка при проверке обновлений игр:', error);
+  }
+}
+
+// 🔹 Запуск проверки каждые 10 секунд
+setInterval(checkGameStatusUpdates, 180000);
+// if (global.statusCheckInterval) clearInterval(global.statusCheckInterval);
+// global.statusCheckInterval = setInterval(checkGameStatusUpdates, 10000);
+
 
 if (process.env.BOT_DISABLED === 'true') {
     console.log('Бот временно отключен.');
