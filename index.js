@@ -218,19 +218,35 @@ gameObj.set("winnerName", winnerName);
 gameObj.set("status", "finish");
 
 await gameObj.save();
+
+// 🔹 Уведомляем игроков о завершении игры
+let message = `🏆 *Игра завершена!*\n\n🎖 *Победитель:* ${winnerName}\n🆔 *ID игры:* \`${gameId}\``;
+
+if (gameObj.get('creatorId')) {
+    let creatorMessage = message;
+    if (gameObj.get('creatorId') === winnerId) {
+        creatorMessage += `\n\n🎉 Поздравляем, вы победили!`;
+    } else if (winnerId) {
+        creatorMessage += `\n\n😔 К сожалению, вы проиграли.`;
+    } else {
+        creatorMessage += `\n\n🤝 Ничья! Отличная игра!`;
+    }
+    await bot.telegram.sendMessage(gameObj.get('creatorId'), creatorMessage, { parse_mode: 'Markdown' }).catch(() => {});
+}
+
+if (gameObj.get('enemyId')) {
+    let enemyMessage = message;
+    if (gameObj.get('enemyId') === winnerId) {
+        enemyMessage += `\n\n🎉 Поздравляем, вы победили!`;
+    } else if (winnerId) {
+        enemyMessage += `\n\n😔 К сожалению, вы проиграли.`;
+    } else {
+        enemyMessage += `\n\n🤝 Ничья! Отличная игра!`;
+    }
+    await bot.telegram.sendMessage(gameObj.get('enemyId'), enemyMessage, { parse_mode: 'Markdown' }).catch(() => {});
+}
+
 delete userSessions[userId];
-
-// 🔹 Отправляем сообщение об окончании игры
-// let winnerText = winnerName ? `🏆 Победитель: <b>${winnerName}</b>` : "🤝 Ничья!";
-
-// const message =
-//   `✅ <b>Игра завершена!</b>\n\n` +
-//   `🎯 <b>Совпадений:</b> ${totalCoincidences}\n\n` +
-//   `👤 <b>${gameObj.get("creatorName")}:</b> ${resultCreator} очк.\n` +
-//   `👤 <b>${gameObj.get("enemyName")}:</b> ${resultEnemy} очк.\n\n` +
-//   winnerText;
-
-// await ctx.reply(message, { parse_mode: "HTML" });
 
 }
 
@@ -855,19 +871,35 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
   gameObj.set("status", "finish");
 
   await gameObj.save();
+
+  // 🔹 Уведомляем игроков о завершении игры
+  let message = `🏆 *Игра завершена!*\n\n🎖 *Победитель:* ${winnerName}\n🆔 *ID игры:* \`${gameId}\``;
+
+  if (gameObj.get('creatorId')) {
+      let creatorMessage = message;
+      if (gameObj.get('creatorId') === winnerId) {
+          creatorMessage += `\n\n🎉 Поздравляем, вы победили!`;
+      } else if (winnerId) {
+          creatorMessage += `\n\n😔 К сожалению, вы проиграли.`;
+      } else {
+          creatorMessage += `\n\n🤝 Ничья! Отличная игра!`;
+      }
+      await bot.telegram.sendMessage(gameObj.get('creatorId'), creatorMessage, { parse_mode: 'Markdown' }).catch(() => {});
+  }
+
+  if (gameObj.get('enemyId')) {
+      let enemyMessage = message;
+      if (gameObj.get('enemyId') === winnerId) {
+          enemyMessage += `\n\n🎉 Поздравляем, вы победили!`;
+      } else if (winnerId) {
+          enemyMessage += `\n\n😔 К сожалению, вы проиграли.`;
+      } else {
+          enemyMessage += `\n\n🤝 Ничья! Отличная игра!`;
+      }
+      await bot.telegram.sendMessage(gameObj.get('enemyId'), enemyMessage, { parse_mode: 'Markdown' }).catch(() => {});
+  }
+
   delete userSessions[userId];
-
-  // 🔹 Отправляем сообщение об окончании игры
-  // let winnerText = winnerName ? `🏆 Победитель: <b>${winnerName}</b>` : "🤝 Ничья!";
-
-  // const message =
-  //   `✅ <b>Игра завершена!</b>\n\n` +
-  //   `🎯 <b>Совпадений:</b> ${totalCoincidences}\n\n` +
-  //   `👤 <b>${gameObj.get("creatorName")}:</b> ${resultCreator} очк.\n` +
-  //   `👤 <b>${gameObj.get("enemyName")}:</b> ${resultEnemy} очк.\n` +
-  //   winnerText;
-
-  // await ctx.reply(message, { parse_mode: "HTML" });
 
 });
 
@@ -1042,6 +1074,16 @@ bot.on("text", async (ctx) => {
       await ctx.reply(
         `✔️ Вы успешно присоединились к игре! Ваша ставка: ${rate}.\n Ожидайте хода ведущего!`
       );
+
+      // 🔹 Отправляем сообщение создателю игры
+    if (game.get('creatorId')) {
+      await bot.telegram.sendMessage(
+          game.get('creatorId'),
+          `👥 *Ваш соперник присоединился к игре!* Проверьте текущие игры!`,
+          { parse_mode: 'Markdown' }
+      ).catch(() => {});
+  }
+
       delete userSessions[ctx.from.id];
       break;
 
@@ -1066,6 +1108,14 @@ bot.on("text", async (ctx) => {
       await gameCreator.save();
 
       await ctx.reply(`✅ Ваша ставка ${rateCreator} сохранена! Ваш ход!`);
+      // 🔹 Отправляем сообщение сопернику
+    if (gameCreator.get('enemyId')) {
+      await bot.telegram.sendMessage(
+          gameCreator.get('enemyId'),
+          `🎯 *Ваш соперник сделал ставку!*`,
+          { parse_mode: 'Markdown' }
+      ).catch(() => {});
+  }
       delete userSessions[ctx.from.id];
 
       // 🔹 Автоматически показываем список игр
@@ -1133,95 +1183,6 @@ bot.on("text", async (ctx) => {
 // bot.telegram.deleteWebhook();
 // bot.startPolling();
 
-let lastCheckedTime = new Date();
-let notifiedGames = new Set(); // Кэш для предотвращения дублирования
-
-async function checkGameStatusUpdates() {
-  const Game = Parse.Object.extend('Games');
-  const query = new Parse.Query(Game);
-  
-  // Фильтруем игры, изменённые после последней проверки
-  query.greaterThan("updatedAt", lastCheckedTime);
-
-  try {
-      const updatedGames = await query.find();
-      // lastCheckedTime = new Date(); // Обновляем время последней проверки
-
-      for (const game of updatedGames) {
-          const status = game.get('status');
-          const creatorId = game.get('creatorId');
-          const enemyId = game.get('enemyId');
-
-          // let message = `📢 *Статус вашей игры обновлён!* 🆔 \`${game.id}\`\n`;
-
-          switch (status) {
-              case 'full':
-                  if (creatorId) {
-                      await bot.telegram.sendMessage(creatorId, `👥 Ваш соперник присоединился к игре ${game.id}! Ожидается ваша ставка! Проверьте текущие игры!`, { parse_mode: 'Markdown' }).catch(() => {});
-                  }
-                  // if (enemyId) {
-                  //     await bot.telegram.sendMessage(enemyId, `👥 Вы присоединились к игре! Ожидается ставка соперника!..`, { parse_mode: 'Markdown' }).catch(() => {});
-                  // }
-                  break;
-
-              // case 'working':
-              //     if (creatorId) {
-              //         await bot.telegram.sendMessage(creatorId, `🎯 Вы сделали ставку! Ваш ход!`, { parse_mode: 'Markdown' }).catch(() => {});
-              //     }
-              //     if (enemyId) {
-              //         await bot.telegram.sendMessage(enemyId, `🎯 Ваш соперник сделал ставку!..`, { parse_mode: 'Markdown' }).catch(() => {});
-              //     }
-              //     break;
-
-              case 'finish':
-                  let winnerId = game.get('winnerId');
-                  let winnerName = game.get('winnerName') || 'Ничья';
-
-                  let resultMessage = `✅ *Игра ${game.id} завершена!*\n\n🎖 *Победитель:* ${winnerName}`;
-
-                  if (creatorId) {
-                      let creatorMessage = resultMessage;
-                      if (creatorId === winnerId) {
-                          creatorMessage += `\n\n🎉 Поздравляем, вы победили!`;
-                      } else if (winnerId) {
-                          creatorMessage += `\n\n😔 К сожалению, вы проиграли.`;
-                      } else {
-                          creatorMessage += `\n\n🤝 Ничья!`;
-                      }
-                      await bot.telegram.sendMessage(creatorId, creatorMessage, { parse_mode: 'Markdown' }).catch(() => {});
-                  }
-
-                  if (enemyId) {
-                      let enemyMessage = resultMessage;
-                      if (enemyId === winnerId) {
-                          enemyMessage += `\n\n🎉 Поздравляем, вы победили!`;
-                      } else if (winnerId) {
-                          enemyMessage += `\n\n😔 К сожалению, вы проиграли.`;
-                      } else {
-                          enemyMessage += `\n\n🤝 Ничья!`;
-                      }
-                      await bot.telegram.sendMessage(enemyId, enemyMessage, { parse_mode: 'Markdown' }).catch(() => {});
-                  }
-                  break;
-          }
-          
-      }
-      // Обновляем время последней проверки после обработки всех игр
-      lastCheckedTime = new Date();
-
-      // Очищаем кэш уведомлений раз в 5 минут
-      if (notifiedGames.size > 50) {
-          notifiedGames.clear();
-      }
-  } catch (error) {
-      console.error('Ошибка при проверке обновлений игр:', error);
-  }
-}
-
-// 🔹 Запуск проверки каждые 10 секунд
-setInterval(checkGameStatusUpdates, 360000);
-// if (global.statusCheckInterval) clearInterval(global.statusCheckInterval);
-// global.statusCheckInterval = setInterval(checkGameStatusUpdates, 10000);
 
 
 if (process.env.BOT_DISABLED === 'true') {
