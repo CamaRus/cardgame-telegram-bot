@@ -669,20 +669,20 @@ bot.action(/^game_(.+)$/, async (ctx) => {
         `📋 *Ваши варианты:*\n` +
         mismatchValuesCreator.map((v, i) => `${i + 1}\\.\ ${v}`).join("\n");
 
-      await ctx.replyWithMarkdownV2(message, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "💰 СДЕЛАТЬ СТАВКУ", callback_data: `bet_${gameId}` }],
-          ],
-        },
-      });
+      // await ctx.replyWithMarkdownV2(message, {
+      //   reply_markup: {
+      //     inline_keyboard: [
+      //       [{ text: "💰 СДЕЛАТЬ СТАВКУ", callback_data: `bet_${gameId}` }],
+      //     ],
+      //   },
+      // });
 
-      // await ctx.replyWithMarkdown(
-      //   message,
-      //   Markup.inlineKeyboard([
-      //     [Markup.button.callback("💰 СДЕЛАТЬ СТАВКУ", `bet_${gameId}`)],
-      //   ])
-      // );
+      await ctx.replyWithMarkdown(
+        message,
+        Markup.inlineKeyboard([
+          [Markup.button.callback("💰 СДЕЛАТЬ СТАВКУ", `bet_${gameId}`)],
+        ])
+      );
 
     } else if (userId === creatorId && status === "working") {
       const theme1 = game.get("MatchTheme") || "Не указана";
