@@ -9,6 +9,15 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 const userSessions = {}; // Хранение временных данных пользователя
 
+function escapeMarkdown(text) {
+  return text.replace(/[_*[\]()~`>#+-=|{}.!]/g, '\\$&');
+}
+
+function escapeMarkdownV2(text) {
+  return text.replace(/[_*[\]()~`>#+-=|{}.!]/g, '\\$&');
+}
+
+
 async function getRandomTheme(excludedTheme = null) {
   try {
     const Themes = Parse.Object.extend("Themes");
@@ -25,6 +34,7 @@ async function getRandomTheme(excludedTheme = null) {
     return "Ошибка при выборе темы";
   }
 }
+
 
 async function displayGames(ctx, statusFilter = null) {
   const userId = ctx.from.id;
@@ -54,9 +64,12 @@ async function displayGames(ctx, statusFilter = null) {
 
     for (const game of games) {
       const gameId = game.id;
-      const creatorName = game.get("creatorName") || "Аноним";
+      const creatorName = game.get("creatorName").replace(
+        /[-._]/g,
+        "\\$&"
+      ) || "Аноним";
       const creatorId = game.get("creatorId");
-      const enemyName = game.get("enemyName") || "";
+      const enemyName = game.get("enemyName");
       const status = game.get("status");
     const createdAt = game.get('createdAt').toLocaleString('ru-RU', {
         timeZone: 'Europe/Moscow',  // 🔹 Указываем часовой пояс (можно изменить)
@@ -66,8 +79,14 @@ async function displayGames(ctx, statusFilter = null) {
         hour: '2-digit',
         minute: '2-digit',
     });
-      const matchTheme = game.get("MatchTheme");
-      const mismatchTheme = game.get("MismatchTheme");
+      const matchTheme = game.get("MatchTheme").replace(
+        /[-._]/g,
+        "\\$&"
+      );
+      const mismatchTheme = game.get("MismatchTheme").replace(
+        /[-._]/g,
+        "\\$&"
+      );
 
       let statusText = "⏳ В поиске соперника";
 
@@ -85,7 +104,11 @@ async function displayGames(ctx, statusFilter = null) {
         `🆔 *ID:* \`${gameId}\`\n` +
         `📅 *Дата создания:* ${createdAt}\n` +
         `👤 *Создатель:* ${creatorName}\n` +
-        `🎭 *Соперник:* ${enemyName}\n` +
+        (typeof enemyName !== 'undefined' ? `🎭 *Соперник:* ${enemyName.replace(
+          /[-._]/g,
+          "\\$&"
+        )}\n` : '') +
+        // `🎭 *Соперник:* ${enemyName}\n` +
         `📌 *Статус:* ${statusText}`;
 
       const message2 =
@@ -93,23 +116,35 @@ async function displayGames(ctx, statusFilter = null) {
         `🆔 *ID:* \`${gameId}\`\n` +
         `📅 *Дата создания:* ${createdAt}\n` +
         `👤 *Создатель:* ${creatorName}\n` +
-        `🎭 *Соперник:* ${enemyName}\n` +
+        // `🎭 *Соперник:* ${enemyName}\n` +
+        (typeof enemyName !== 'undefined' ? `🎭 *Соперник:* ${enemyName.replace(
+          /[-._]/g,
+          "\\$&"
+        )}\n` : '') +
         `📑 *Категория игры на совпадение:* ${matchTheme}\n` +
         `📑 *Категория игры на несовпадение:* ${mismatchTheme}\n` +
         `📌 *Статус:* ${statusText}`;
 
-      if (status !== "finish") {
+        let buttons = [[Markup.button.callback('▶️ ОТКРЫТЬ ИГРУ', `game_${gameId}`)]];
+
+      if (status !== "finish" && userId !== creatorId) {
         await ctx.replyWithMarkdown(
           message2,
           Markup.inlineKeyboard([
-            [Markup.button.callback("▶️ Открыть игру", `game_${gameId}`)],
+            [Markup.button.callback("▶️ ОТКРЫТЬ ИГРУ", `game_${gameId}`)],
           ])
         );
-      } else {
+      } 
+      // 🔹 Добавляем кнопку "Удалить", если пользователь – создатель
+      else if (status !== "finish" && userId === creatorId) {
+        buttons.push([Markup.button.callback('🗑 УДАЛИТЬ', `delete_${gameId}`)]);
+        await ctx.replyWithMarkdown(message2, Markup.inlineKeyboard(buttons));
+    }
+      else {
         await ctx.replyWithMarkdown(
           message,
           Markup.inlineKeyboard([
-            [Markup.button.callback("▶️ Открыть игру", `game_${gameId}`)],
+            [Markup.button.callback("▶️ РЕЗУЛЬТАТЫ", `game_${gameId}`)],
           ])
         );
       }
@@ -119,7 +154,6 @@ async function displayGames(ctx, statusFilter = null) {
     ctx.reply("⚠️ Произошла ошибка. Попробуйте позже.");
   }
 }
-
 
 async function finishMatch(ctx, gameId) {
     const userId = ctx.from.id;
@@ -173,20 +207,20 @@ async function finishMatch(ctx, gameId) {
 }
 
 async function finishMismatch(ctx, gameId) {
-    const userId = ctx.from.id;
-    const session = userSessions[userId];
+  const userId = ctx.from.id;
+  const session = userSessions[userId];
 
-    if (!session || session.gameId !== gameId) return;
+  if (!session || session.gameId !== gameId) return;
 
-    // Сохраняем совпадения для второй темы
-    const Game = Parse.Object.extend("Games");
-  const query = new Parse.Query(Game);
-  const gameObj = await query.get(gameId);
-  if (!gameObj) return ctx.reply("⚠️ Ошибка: игра не найдена.");
-    // Загружаем matchCoincidences из базы
-    const coincidences = gameObj.get("coincidences") || { match: [], mismatch: [] };
-    coincidences.match = coincidences.match || [];
-    coincidences.mismatch = session.coincidences; // Сохраняем mismatch совпадения
+  // Сохраняем совпадения для второй темы
+  const Game = Parse.Object.extend("Games");
+const query = new Parse.Query(Game);
+const gameObj = await query.get(gameId);
+if (!gameObj) return ctx.reply("⚠️ Ошибка: игра не найдена.");
+  // Загружаем matchCoincidences из базы
+  const coincidences = gameObj.get("coincidences") || { match: [], mismatch: [] };
+  coincidences.match = coincidences.match || [];
+  coincidences.mismatch = session.coincidences; // Сохраняем mismatch совпадения
 
 const totalCoincidences = coincidences.match.length + coincidences.mismatch.length;
 
@@ -203,12 +237,14 @@ let winnerId = null;
 let winnerName = null;
 
 if (resultCreator > resultEnemy) {
-  winnerId = gameObj.get("creatorId");
-  winnerName = gameObj.get("creatorName");
+winnerId = gameObj.get("creatorId");
+winnerName = gameObj.get("creatorName");
 } else if (resultEnemy > resultCreator) {
-  winnerId = gameObj.get("enemyId");
-  winnerName = gameObj.get("enemyName");
+winnerId = gameObj.get("enemyId");
+winnerName = gameObj.get("enemyName");
 }
+const creatorId = gameObj.get("creatorId");
+const enemyId = gameObj.get("enemyId")
 
 gameObj.set("coincidences", coincidences);
 gameObj.set("resultCreator", resultCreator);
@@ -219,37 +255,69 @@ gameObj.set("status", "finish");
 
 await gameObj.save();
 
+
 // 🔹 Уведомляем игроков о завершении игры
-let message = `🏆 *Игра завершена!*\n\n🎖 *Победитель:* ${winnerName}\n🆔 *ID игры:* \`${gameId}\``;
+let message = `🏆 *Игра завершена!*\nПроверьте завершённые игры!\n🎖 *Победитель:* ${winnerName}\n🆔 *ID игры:* \`${gameId}\``;
 
 if (gameObj.get('creatorId')) {
-    let creatorMessage = message;
-    if (gameObj.get('creatorId') === winnerId) {
-        creatorMessage += `\n\n🎉 Поздравляем, вы победили!`;
-    } else if (winnerId) {
-        creatorMessage += `\n\n😔 К сожалению, вы проиграли.`;
-    } else {
-        creatorMessage += `\n\n🤝 Ничья! Отличная игра!`;
-    }
-    await bot.telegram.sendMessage(gameObj.get('creatorId'), creatorMessage, { parse_mode: 'Markdown' }).catch(() => {});
+  let creatorMessage = message;
+  if (gameObj.get('creatorId') === winnerId) {
+      creatorMessage += `\n🎉 Поздравляем, вы победили!`;
+  } else if (winnerId) {
+      creatorMessage += `\n😔 К сожалению, вы проиграли.`;
+  } else {
+      creatorMessage = `🏆 *Игра завершена!*\nПроверьте завершённые игры!\n🆔 *ID игры:* \`${gameId}\`\n🤝 Ничья!`;
+  }
+  await bot.telegram.sendMessage(gameObj.get('creatorId'), creatorMessage, { parse_mode: 'Markdown' }).catch(() => {});
 }
 
 if (gameObj.get('enemyId')) {
-    let enemyMessage = message;
-    if (gameObj.get('enemyId') === winnerId) {
-        enemyMessage += `\n\n🎉 Поздравляем, вы победили!`;
-    } else if (winnerId) {
-        enemyMessage += `\n\n😔 К сожалению, вы проиграли.`;
-    } else {
-        enemyMessage += `\n\n🤝 Ничья! Отличная игра!`;
-    }
-    await bot.telegram.sendMessage(gameObj.get('enemyId'), enemyMessage, { parse_mode: 'Markdown' }).catch(() => {});
-}
+  let enemyMessage = message;
+  if (gameObj.get('enemyId') === winnerId) {
+      enemyMessage += `\n🎉 Поздравляем, вы победили!`;
+  } else if (winnerId) {
+      enemyMessage += `\n😔 К сожалению, вы проиграли.`;
+  } else {
+      enemyMessage = `🏆 *Игра завершена!*\nПроверьте завершённые игры!\n🆔 *ID игры:* \`${gameId}\`\n🤝 Ничья!`;
+  }
+  await bot.telegram.sendMessage(gameObj.get('enemyId'), enemyMessage, { parse_mode: 'Markdown' }).catch(() => {});
 
+}
 delete userSessions[userId];
 
 }
 
+async function deleteOldGames() {
+  try {
+      const Game = Parse.Object.extend("Games");
+      const query = new Parse.Query(Game);
+
+      // Получаем дату двухдневной давности
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+      // Фильтруем игры, созданные более 2 суток назад и не имеющие статус "finish"
+      query.lessThan("updatedAt", twoDaysAgo);
+      query.notEqualTo("status", "finish");
+
+      const oldGames = await query.find();
+      
+      if (oldGames.length > 0) {
+          console.log(`🗑 Найдено ${oldGames.length} старых игр для удаления...`);
+          for (const game of oldGames) {
+              await game.destroy();
+              console.log(`✅ Игра ${game.id} удалена`);
+          }
+      } else {
+          console.log("✅ Нет старых игр для удаления.");
+      }
+  } catch (error) {
+      console.error("❌ Ошибка при удалении старых игр:", error);
+  }
+}
+
+// Запускаем проверку каждые 4 часа
+setInterval(deleteOldGames, 240 * 60 * 1000); // 4 часа
 
 bot.start((ctx) => {
   userSessions[ctx.from.id] = {
@@ -505,6 +573,7 @@ bot.action("random_opponent", async (ctx) => {
   try {
     // 🔹 Поиск игры со статусом waiting, где пользователь не участвует
     query.equalTo("status", "waiting");
+    query.equalTo("visibility", true);
     query.notEqualTo("creatorId", userId);
     query.doesNotExist("enemyId");
     query.limit(1);
@@ -552,14 +621,8 @@ bot.action(/^game_(.+)$/, async (ctx) => {
     }
 
     const creatorId = game.get("creatorId");
-    const creatorName = (game.get("creatorName") || "Аноним").replace(
-      /[-._]/g,
-      "\\$&"
-    );
-    const enemyName = (game.get("enemyName") || "Ожидает соперника").replace(
-      /[-._]/g,
-      "\\$&"
-    );
+    const creatorName = (game.get("creatorName") || "Аноним");
+    const enemyName = (game.get("enemyName") || "Ожидает соперника");
     const status = game.get("status");
     const enemyId = game.get("enemyId");
 
@@ -609,10 +672,18 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       await ctx.replyWithMarkdownV2(message, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "💰 Сделать ставку", callback_data: `bet_${gameId}` }],
+            [{ text: "💰 СДЕЛАТЬ СТАВКУ", callback_data: `bet_${gameId}` }],
           ],
         },
       });
+
+      // await ctx.replyWithMarkdown(
+      //   message,
+      //   Markup.inlineKeyboard([
+      //     [Markup.button.callback("💰 СДЕЛАТЬ СТАВКУ", `bet_${gameId}`)],
+      //   ])
+      // );
+
     } else if (userId === creatorId && status === "working") {
       const theme1 = game.get("MatchTheme") || "Не указана";
       const theme2 = game.get("MismatchTheme") || "Не указана";
@@ -759,7 +830,7 @@ bot.action(/^bet_(.+)$/, async (ctx) => {
     ctx.answerCbQuery();
   } catch (error) {
     console.error("Ошибка при открытии ставки:", error);
-    ctx.answerCbQuery("⚠️ Ошибка. Попробуйте позже.", { show_alert: true });
+    ctx.answerCbQuery("⚠️ Ошибка. Игра не найдена или удалена!", { show_alert: true });
   }
 });
 
@@ -864,6 +935,9 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
     mismatch: session.coincidences || [],
     total: totalCoincidences,
   });
+
+  const creatorId = gameObj.get("creatorId");
+ const enemyId = gameObj.get("enemyId")
   gameObj.set("resultCreator", resultCreator);
   gameObj.set("resultEnemy", resultEnemy);
   gameObj.set("winnerId", winnerId);
@@ -873,35 +947,155 @@ bot.action(/^finish_mismatch_(.+)$/, async (ctx) => {
   await gameObj.save();
 
   // 🔹 Уведомляем игроков о завершении игры
-  let message = `🏆 *Игра завершена!*\n\n🎖 *Победитель:* ${winnerName}\n🆔 *ID игры:* \`${gameId}\``;
+  let message = `🏆 *Игра завершена!*\nПроверьте завершённые игры!\n🎖 *Победитель:* ${winnerName}\n🆔 *ID игры:* \`${gameId}\``;
 
   if (gameObj.get('creatorId')) {
       let creatorMessage = message;
       if (gameObj.get('creatorId') === winnerId) {
-          creatorMessage += `\n\n🎉 Поздравляем, вы победили!`;
+          creatorMessage += `\n🎉 Поздравляем, вы победили!`;
       } else if (winnerId) {
-          creatorMessage += `\n\n😔 К сожалению, вы проиграли.`;
+          creatorMessage += `\n😔 К сожалению, вы проиграли.`;
       } else {
-          creatorMessage += `\n\n🤝 Ничья! Отличная игра!`;
+        creatorMessage = `🏆 *Игра завершена!*\nПроверьте завершённые игры!\n🆔 *ID игры:* \`${gameId}\`\n🤝 Ничья!`;
       }
       await bot.telegram.sendMessage(gameObj.get('creatorId'), creatorMessage, { parse_mode: 'Markdown' }).catch(() => {});
+      // await openGame(ctx, gameId);
   }
 
   if (gameObj.get('enemyId')) {
       let enemyMessage = message;
       if (gameObj.get('enemyId') === winnerId) {
-          enemyMessage += `\n\n🎉 Поздравляем, вы победили!`;
+          enemyMessage += `\n🎉 Поздравляем, вы победили!`;
       } else if (winnerId) {
-          enemyMessage += `\n\n😔 К сожалению, вы проиграли.`;
+          enemyMessage += `\n😔 К сожалению, вы проиграли.`;
       } else {
-          enemyMessage += `\n\n🤝 Ничья! Отличная игра!`;
+        enemyMessage = `🏆 *Игра завершена!*\nПроверьте завершённые игры!\n🆔 *ID игры:* \`${gameId}\`\n🤝 Ничья!`;
       }
       await bot.telegram.sendMessage(gameObj.get('enemyId'), enemyMessage, { parse_mode: 'Markdown' }).catch(() => {});
+      // await openGame(ctx, gameId);
   }
 
   delete userSessions[userId];
-
 });
+
+
+bot.action(/^delete_(.+)$/, async (ctx) => {
+  const gameId = ctx.match[1];
+
+  // Отправляем текстовое сообщение
+//   await ctx.replyWithMarkdownV2(
+//     `❗ Вы уверены, что хотите удалить игру с ID \`${gameId.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&')}\`?`
+// );
+
+// Отправляем кнопки отдельно
+await ctx.reply(
+    `❗ Вы уверены, что хотите удалить игру с ID \`${gameId.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&')}\`?`,
+    Markup.inlineKeyboard([
+        [Markup.button.callback('✅ Да, удалить', `confirm_delete_${gameId}`)],
+        [Markup.button.callback('❌ Отмена', `cancel_delete`)]
+    ])
+);
+});
+
+bot.action(/^confirm_delete_(.+)$/, async (ctx) => {
+  const gameId = ctx.match[1];
+  const userId = ctx.from.id;
+
+  const Game = Parse.Object.extend('Games');
+  const query = new Parse.Query(Game);
+
+  try {
+      const game = await query.get(gameId);
+
+      if (!game) {
+          return ctx.answerCbQuery('⚠️ Игра не найдена.', { show_alert: true });
+      }
+
+      // Проверяем, является ли пользователь создателем игры
+      if (game.get('creatorId') !== userId) {
+          return ctx.answerCbQuery('❌ Вы не являетесь создателем этой игры.', { show_alert: true });
+      }
+
+      await game.destroy();
+      await ctx.reply('✅ Игра успешно удалена!');
+      return displayGames(ctx);
+  } catch (error) {
+      console.error('Ошибка при удалении игры:', error);
+      ctx.answerCbQuery('⚠️ Ошибка при удалении игры. Попробуйте позже.', { show_alert: true });
+  }
+});
+
+// bot.action("cancel_delete", async (ctx) => {
+//   await ctx.answerCbQuery(); // Закрываем всплывающее уведомление
+//   await ctx.editMessageReplyMarkup(null); // Убираем кнопки
+// });
+
+bot.action("cancel_delete", async (ctx) => {
+  try {
+      await ctx.answerCbQuery(); // Закрываем всплывающее уведомление
+      await ctx.deleteMessage(); // Удаляем сообщение с кнопками (подтверждение удаления)
+
+      // Дополнительно удаляем сообщение "Выберите действия" (если известно message_id)
+      if (ctx.session.deletePromptMessageId) {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.session.deletePromptMessageId);
+          delete ctx.session.deletePromptMessageId; // Удаляем переменную, чтобы не было лишних вызовов
+      }
+  } catch (error) {
+      console.error("Ошибка при удалении сообщений:", error);
+  }
+});
+
+bot.action(['visibility_true', 'visibility_false'], async (ctx) => {
+  const userId = ctx.from.id;
+  const session = userSessions[userId];
+
+  if (!session) return ctx.answerCbQuery('Ошибка: данные игры не найдены.');
+
+  const visibility = ctx.match[0] === 'visibility_true'; // Если "Да" → true, если "Нет" → false
+
+  // Сохранение данных игры
+  const Game = Parse.Object.extend('Games');
+  const game = new Game();
+  game.set('MatchTheme', session.theme);
+  game.set('MismatchTheme', session.alternateTheme);
+  game.set('MatchValuesCreator', session.matchValues);
+  game.set('MismatchValuesCreator', session.mismatchValues);
+  game.set('creatorId', userId);
+  game.set('creatorName', ctx.from.username || ctx.from.first_name || 'Аноним');
+  game.set('status', 'waiting');
+  game.set('visibility', visibility);
+
+  await game.save();
+  const message = `✅ Игра создана! ID: ` + `<code>${game.id}</code>\n👀 Видимость: ${visibility ? 'доступна для всех' : 'скрыта'}`;
+  await ctx.reply(message, { parse_mode: "HTML" });
+  
+  // ctx.reply(`✅ Игра создана! ID: \`${game.id}\`\n👀 Видимость: ${visibility ? 'Доступна для всех' : 'Скрыта'}`);
+  delete userSessions[userId];
+
+
+
+
+  //////////////////////////////////////////
+  // const Game = Parse.Object.extend("Games");
+  //       const game = new Game();
+  //       game.set("MatchTheme", session.theme);
+  //       game.set("MismatchTheme", session.alternateTheme);
+  //       game.set("MatchValuesCreator", session.matchValues);
+  //       game.set("MismatchValuesCreator", session.mismatchValues);
+  //       game.set("creatorId", ctx.from.id);
+  //       game.set(
+  //         "creatorName",
+  //         ctx.from.username || ctx.from.first_name || "Аноним"
+  //       );
+  //       game.set("status", "waiting");
+  //       await game.save();
+  //       const message = `✅ Игра создана! ID: ` + `<code>${game.id}</code>`;
+  //       await ctx.reply(message, { parse_mode: "HTML" });
+  //       delete userSessions[ctx.from.id];
+    ///////////////////////////////////////////
+});
+
+
 
 bot.on("text", async (ctx) => {
   const session = userSessions[ctx.from.id];
@@ -964,23 +1158,30 @@ bot.on("text", async (ctx) => {
           `Введите следующий вариант (${session.mismatchValues.length + 1}/6):`
         );
       } else {
-        const Game = Parse.Object.extend("Games");
-        const game = new Game();
-        game.set("MatchTheme", session.theme);
-        game.set("MismatchTheme", session.alternateTheme);
-        game.set("MatchValuesCreator", session.matchValues);
-        game.set("MismatchValuesCreator", session.mismatchValues);
-        game.set("creatorId", ctx.from.id);
-        game.set(
-          "creatorName",
-          ctx.from.username || ctx.from.first_name || "Аноним"
-        );
-        game.set("status", "waiting");
-        await game.save();
-        const message = `✅ Игра создана! ID: ` + `<code>${game.id}</code>`;
-        await ctx.reply(message, { parse_mode: "HTML" });
-        delete userSessions[ctx.from.id];
-        // return displayGames(ctx);
+        await ctx.reply(
+          '👀 Сделать игру видимой для всех?',
+            Markup.inlineKeyboard([
+                [Markup.button.callback('✅ ДА', 'visibility_true')],
+                [Markup.button.callback('❌ НЕТ', 'visibility_false')]
+            ])
+      );
+
+        // const Game = Parse.Object.extend("Games");
+        // const game = new Game();
+        // game.set("MatchTheme", session.theme);
+        // game.set("MismatchTheme", session.alternateTheme);
+        // game.set("MatchValuesCreator", session.matchValues);
+        // game.set("MismatchValuesCreator", session.mismatchValues);
+        // game.set("creatorId", ctx.from.id);
+        // game.set(
+        //   "creatorName",
+        //   ctx.from.username || ctx.from.first_name || "Аноним"
+        // );
+        // game.set("status", "waiting");
+        // await game.save();
+        // const message = `✅ Игра создана! ID: ` + `<code>${game.id}</code>`;
+        // await ctx.reply(message, { parse_mode: "HTML" });
+        // delete userSessions[ctx.from.id];
       }
       break;
 
@@ -993,6 +1194,7 @@ bot.on("text", async (ctx) => {
         const game = await query.get(gameId);
         const creatorId = game.get("creatorId");
         const enemyId = game.get("enemyId");
+        const status = game.get("status");
 
         // Проверяем, участвует ли пользователь в игре
         if (creatorId === ctx.from.id || enemyId === ctx.from.id) {
