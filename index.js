@@ -713,7 +713,9 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       const matchValuesCreator = (game.get("MatchValuesCreator") || []).map(
         (v) => v.replace(/[-._]/g, "\\$&")
       );
-      
+      const matchValuesEnemy = (game.get("MatchValuesEnemy") || []).map(
+        (v) => v.replace(/[-._]/g, "\\$&")
+      );
 
       ctx.answerCbQuery("📋 Данные отправлены!", { show_alert: false });
 
