@@ -621,8 +621,14 @@ bot.action(/^game_(.+)$/, async (ctx) => {
     }
 
     const creatorId = game.get("creatorId");
-    const creatorName = (game.get("creatorName") || "Аноним");
-    const enemyName = (game.get("enemyName") || "Ожидает соперника");
+    const creatorName = game.get("creatorName").replace(
+      /[-._]/g,
+      "\\$&"
+    ) || "Аноним";
+    const enemyName = game.get("enemyName").replace(
+      /[-._]/g,
+      "\\$&"
+    ) || "Ожидает соперника";
     const status = game.get("status");
     const enemyId = game.get("enemyId");
 
@@ -685,14 +691,29 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       );
 
     } else if (userId === creatorId && status === "working") {
-      const theme1 = game.get("MatchTheme") || "Не указана";
-      const theme2 = game.get("MismatchTheme") || "Не указана";
-      const matchValuesCreator = game.get("MatchValuesCreator") || [];
-      const mismatchValuesCreator = game.get("MismatchValuesCreator") || [];
-      const matchValuesEnemy = game.get("matchValuesEnemy") || [];
-      const mismatchValuesEnemy = game.get("mismatchValuesEnemy") || [];
-      const rateCreator = game.get("rateCreator") || "Не сделана";
-      const rateEnemy = game.get("rateEnemy") || "Не сделана";
+      // const theme1 = game.get("MatchTheme").replace(
+      //   /[-._]/g,
+      //   "\\$&"
+      // ) || "Не указана";
+      // const theme2 = game.get("MismatchTheme").replace(
+      //   /[-._]/g,
+      //   "\\$&"
+      // ) || "Не указана";
+      // const matchValuesCreator = game.get("MatchValuesCreator") || [];
+      // const mismatchValuesCreator = game.get("MismatchValuesCreator") || [];
+      // const matchValuesEnemy = game.get("matchValuesEnemy") || [];
+      // const mismatchValuesEnemy = game.get("mismatchValuesEnemy") || [];
+      // const rateCreator = game.get("rateCreator") || "Не сделана";
+      // const rateEnemy = game.get("rateEnemy") || "Не сделана";
+
+      const theme1 = (game.get("MatchTheme") || "Не указана").replace(
+        /[-._]/g,
+        "\\$&"
+      );
+      const matchValuesCreator = (game.get("MatchValuesCreator") || []).map(
+        (v) => v.replace(/[-._]/g, "\\$&")
+      );
+      
 
       ctx.answerCbQuery("📋 Данные отправлены!", { show_alert: false });
 
