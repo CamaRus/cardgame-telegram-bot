@@ -713,7 +713,7 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       const matchValuesCreator = (game.get("MatchValuesCreator") || []).map(
         (v) => v.replace(/[-._]/g, "\\$&")
       );
-      const matchValuesEnemy = (game.get("MatchValuesEnemy") || []).map(
+      const matchValuesEnemy = (game.get("matchValuesEnemy") || []).map(
         (v) => v.replace(/[-._]/g, "\\$&")
       );
 
