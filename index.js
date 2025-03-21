@@ -621,14 +621,8 @@ bot.action(/^game_(.+)$/, async (ctx) => {
     }
 
     const creatorId = game.get("creatorId");
-    const creatorName = game.get("creatorName").replace(
-      /[-._]/g,
-      "\\$&"
-    ) || "Аноним";
-    const enemyName = game.get("enemyName").replace(
-      /[-._]/g,
-      "\\$&"
-    ) || "Ожидает соперника";
+    const creatorName = game.get("creatorName") || "Аноним";
+    const enemyName = game.get("enemyName") || "Ожидает соперника";
     const status = game.get("status");
     const enemyId = game.get("enemyId");
 
@@ -662,8 +656,14 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       const message =
         `🎮 *Данные игры:*\n\n` +
         `🆔 *ID игры:* \`${gameId}\`\n` +
-        `👤 *Создатель:* ${creatorName}\n` +
-        `🎭 *Соперник:* ${enemyName}\n` +
+        `👤 *Создатель:* ${creatorName.replace(
+          /[-._]/g,
+          "\\$&"
+        )}\n` +
+        `🎭 *Соперник:* ${enemyName.replace(
+          /[-._]/g,
+          "\\$&"
+        )}\n` +
         // `⚖️ *Ваша ставка:* ${rateCreator}\n\n` +
         `📌 Категория игры на совпадение: *${matchTheme}\n*` +
         `────────────────────────\n` +
@@ -675,20 +675,20 @@ bot.action(/^game_(.+)$/, async (ctx) => {
         `📋 *Ваши варианты:*\n` +
         mismatchValuesCreator.map((v, i) => `${i + 1}\\.\ ${v}`).join("\n");
 
-      // await ctx.replyWithMarkdownV2(message, {
-      //   reply_markup: {
-      //     inline_keyboard: [
-      //       [{ text: "💰 СДЕЛАТЬ СТАВКУ", callback_data: `bet_${gameId}` }],
-      //     ],
-      //   },
-      // });
+      await ctx.replyWithMarkdownV2(message, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "💰 СДЕЛАТЬ СТАВКУ", callback_data: `bet_${gameId}` }],
+          ],
+        },
+      });
 
-      await ctx.replyWithMarkdown(
-        message,
-        Markup.inlineKeyboard([
-          [Markup.button.callback("💰 СДЕЛАТЬ СТАВКУ", `bet_${gameId}`)],
-        ])
-      );
+      // await ctx.replyWithMarkdown(
+      //   message,
+      //   Markup.inlineKeyboard([
+      //     [Markup.button.callback("💰 СДЕЛАТЬ СТАВКУ", `bet_${gameId}`)],
+      //   ])
+      // );
 
     } else if (userId === creatorId && status === "working") {
       // const theme1 = game.get("MatchTheme").replace(
@@ -706,10 +706,7 @@ bot.action(/^game_(.+)$/, async (ctx) => {
       // const rateCreator = game.get("rateCreator") || "Не сделана";
       // const rateEnemy = game.get("rateEnemy") || "Не сделана";
 
-      const theme1 = (game.get("MatchTheme") || "Не указана").replace(
-        /[-._]/g,
-        "\\$&"
-      );
+      const theme1 = game.get("MatchTheme") || "Не указана";
       const matchValuesCreator = (game.get("MatchValuesCreator") || []).map(
         (v) => v.replace(/[-._]/g, "\\$&")
       );
