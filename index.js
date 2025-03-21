@@ -659,12 +659,12 @@ bot.action(/^game_(.+)$/, async (ctx) => {
         `👤 <b>Создатель:</b> ${creatorName}\n` +
         `🎭 <b>Соперник:</b> ${enemyName}\n` +
         // `⚖️ *Ваша ставка:* ${rateCreator}\n\n` +
-        `📌 Категория игры на совпадение: *${matchTheme}\n*` +
+        `📌 Категория игры на совпадение: *${matchTheme}\n` +
         `────────────────────────\n` +
         `📋 <b>Ваши варианты:</b>\n` +
         matchValuesCreator.map((v, i) => `${i + 1}. ${v}`).join("\n") +
         "\n\n" +
-        `📌 Категория игры на несовпадение: *${mismatchTheme}\n*` +
+        `📌 Категория игры на несовпадение: *${mismatchTheme}\n` +
         `────────────────────────\n` +
         `📋 <b>Ваши варианты:</b>\n` +
         mismatchValuesCreator.map((v, i) => `${i + 1}. ${v}`).join("\n");
