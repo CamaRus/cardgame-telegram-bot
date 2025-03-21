@@ -675,13 +675,26 @@ bot.action(/^game_(.+)$/, async (ctx) => {
         `📋 *Ваши варианты:*\n` +
         mismatchValuesCreator.map((v, i) => `${i + 1}\\.\ ${v}`).join("\n");
 
-      await ctx.replyWithMarkdownV2(message, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "💰 СДЕЛАТЬ СТАВКУ", callback_data: `bet_${gameId}` }],
-          ],
-        },
-      });
+      // await ctx.replyWithMarkdownV2(message, {
+      //   reply_markup: {
+      //     inline_keyboard: [
+      //       [{ text: "💰 СДЕЛАТЬ СТАВКУ", callback_data: `bet_${gameId}` }],
+      //     ],
+      //   },
+      // });
+
+      await ctx.reply(
+        message, 
+        {
+            parse_mode: "HTML",
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "💰 СДЕЛАТЬ СТАВКУ", callback_data: `bet_${gameId}` }]
+                ]
+            }
+        }
+    );
+    
 
       // await ctx.replyWithMarkdown(
       //   message,
